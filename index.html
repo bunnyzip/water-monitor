@@ -65,6 +65,32 @@ tr:nth-child(even) td { background:#e3f2fd; }
 </div>
 
 <div class="card">
+  <h3>⏰ When is water used most? (avg liters per hour)</h3>
+  <div id="avgchart"></div>
+  <div class="cap">average of all logged days • red = peak hours • blue = quietest • gray = no data that hour</div>
+</div>
+
+<div class="card">
+  <h3>📌 Key numbers</h3>
+  <div id="keynums"></div>
+</div>
+
+<div class="card">
+  <h3>🩺 System health</h3>
+  <table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody id="health"></tbody></table>
+</div>
+
+<div class="card">
+  <h3>🏆 Records</h3>
+  <table><thead><tr><th>Record</th><th>Value</th></tr></thead><tbody id="records"></tbody></table>
+</div>
+
+<div class="card">
+  <h3>🔄 Recent cycles (newest first)</h3>
+  <table><thead><tr><th>Start</th><th>End</th><th>Duration</th><th>Fill</th><th>Status</th></tr></thead><tbody id="cycles"></tbody></table>
+</div>
+
+<div class="card">
   <h3>🩺 System</h3>
   <div id="summary"></div>
 </div>
@@ -164,6 +190,63 @@ function render(d){
     '<div class="tile"><div class="v">'+(s.cycles||0)+'</div><div class="l">pump cycles</div></div>' +
     '<div class="tile"><div class="v">'+(s.coverage||0)+'%</div><div class="l">logging coverage</div></div>' +
     '<div class="tile"><div class="v">'+(s.reboots||0)+'</div><div class="l">esp reboots</div></div></div>';
+
+  // ---- avg liters per hour ----
+  const avg = d.avg_hour || Array(24).fill(null);
+  const aHave = avg.map((v,i)=>v!==null?i:-1).filter(i=>i>=0);
+  const aSorted = aHave.slice().sort((a,b)=>avg[b]-avg[a]);
+  const aReds = new Set(aSorted.slice(0,3));
+  const aBlues = new Set(aSorted.slice(-3));
+  let ac = '<svg viewBox="0 0 860 235" width="100%">';
+  avg.forEach((v,h)=>{
+    const x = 18 + h*34;
+    if (v === null){
+      ac += `<rect fill="#cfd8dc" x="${x}" y="170" width="26" height="50" rx="4"/>`;
+      ac += `<text x="${x+13}" y="222" transform="rotate(-90 ${x+13} 222)" text-anchor="start" font-size="10" fill="#78909c" font-weight="bold">n/a</text>`;
+    } else {
+      const fill = aReds.has(h) ? "#ff5252" : (aBlues.has(h) && aHave.length>=7 ? "#40c4ff" : "#66bb6a");
+      const hpx = Math.max(6, v/Math.max(1,...aHave.map(i=>avg[i]))*160);
+      ac += `<rect fill="${fill}" x="${x}" y="${222-hpx}" width="26" height="${hpx}" rx="4"/>`;
+      ac += `<text x="${x+13}" y="${222-hpx-5}" text-anchor="middle" font-size="10.5" fill="#0d47a1" font-weight="bold">${v} L</text>`;
+    }
+    ac += `<text x="${x+13}" y="234" font-size="9.5" fill="#546e7a" text-anchor="middle">${h12(h)}</text>`;
+  });
+  document.getElementById("avgchart").innerHTML = ac + '</svg>';
+
+  // ---- key numbers ----
+  const k = d.key || {};
+  document.getElementById("keynums").innerHTML =
+    '<div class="grid">' +
+    '<div class="tile"><div class="v" style="font-size:17px;">'+h12(k.peak_hour||0)+'</div><div class="l">peak hour (~'+(k.peak_l||0)+' L)</div></div>' +
+    '<div class="tile"><div class="v">'+(k.cycles||0)+'</div><div class="l">cycles ('+(k.normal||0)+' ✔ / '+(k.abn||0)+' ⚠)</div></div>' +
+    '<div class="tile"><div class="v">'+(k.avg_fill_min||0)+' min</div><div class="l">avg fill (+'+(k.avg_fill_l||0)+' L)</div></div>' +
+    '<div class="tile"><div class="v" style="font-size:17px;">🌙 '+(k.night_lh||0)+' / ☀ '+(k.day_lh||0)+' L/h</div><div class="l">night vs day</div></div>' +
+    '<div class="tile" style="flex:1 1 100%;"><div class="v" style="font-size:17px;color:#2e7d32;">✅ avg daily ≈ '+(k.sanity_l||0).toLocaleString()+' L</div><div class="l">= water the pump delivered (anchored fact)</div></div></div>';
+
+  // ---- health ----
+  const hl = d.health || {};
+  document.getElementById("health").innerHTML =
+    '<tr><td>ESP32 reboots detected</td><td>'+(hl.reboots||0)+' (incl. nightly 3:15 AM restarts)</td></tr>' +
+    '<tr><td>Load shedding captured</td><td>~'+(hl.shed_min||0)+' min total</td></tr>' +
+    '<tr><td>Logging coverage</td><td>'+(hl.coverage||0)+'% of the period ('+(hl.monitored_h||0)+' h of '+(hl.span_h||0)+' h)</td></tr>' +
+    '<tr><td>Logging gaps</td><td>'+(hl.gaps||0)+' (biggest '+(hl.biggest_gap_h||0)+' h)</td></tr>' +
+    '<tr><td>Data age</td><td>'+(hl.age_min||0)+' min ago</td></tr>';
+
+  // ---- records ----
+  const r = d.records || {};
+  document.getElementById("records").innerHTML =
+    '<tr><td>⚡ Fastest fill</td><td>'+esc(r.fastest||"—")+'</td></tr>' +
+    '<tr><td>🐢 Longest fill</td><td>'+esc(r.longest||"—")+'</td></tr>' +
+    '<tr><td>📈 Biggest sensor glitch</td><td>'+esc(r.glitch||"—")+'</td></tr>' +
+    '<tr><td>🔥 Busiest day</td><td>'+esc(r.busy||"—")+'</td></tr>';
+
+  // ---- cycles ----
+  const cyc = d.cycles || [];
+  document.getElementById("cycles").innerHTML = cyc.length ? cyc.map(c=>{
+    const fill = (c.l0!==null && c.l1!==null) ? esc(c.l0)+" → "+esc(c.l1)+"% (+"+(c.dl!==null?c.dl.toFixed(1):"?")+"%) <b style='color:#1565c0'>"+(c.liters||0).toLocaleString()+" L</b>" : "?";
+    const st = c.abn ? '<span class="pill bad">⚠ abnormal</span>' : '<span class="pill good">✔ normal</span>';
+    return '<tr><td>'+esc(c.start)+'</td><td>'+esc(c.end)+'</td><td>'+c.dur+' min</td><td>'+fill+'</td><td>'+st+'</td></tr>';
+  }).join("") : '<tr><td colspan="5">no cycles yet</td></tr>';
 }
 
 fetch("data.json?ts=" + Date.now()).then(r=>r.json()).then(render).catch(e=>{
