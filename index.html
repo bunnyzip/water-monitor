@@ -99,6 +99,7 @@ tr:nth-child(even) td { background:#e3f2fd; }
 MAHMUD MONITOR • tank 2,000 L (100% = 1,950 L)</div>
 </div>
 
+<script src="firebase_data.js"></script>
 <script>
 const H = [["12 AM",0],["1 AM",1],["2 AM",2],["3 AM",3],["4 AM",4],["5 AM",5],["6 AM",6],["7 AM",7],["8 AM",8],["9 AM",9],["10 AM",10],["11 AM",11],["12 PM",12],["1 PM",13],["2 PM",14],["3 PM",15],["4 PM",16],["5 PM",17],["6 PM",18],["7 PM",19],["8 PM",20],["9 PM",21],["10 PM",22],["11 PM",23]];
 function h12(h){ return ((h%12)||12) + " " + (h<12?"AM":"PM"); }
@@ -177,7 +178,7 @@ function render(d){
   const stale = (d.updated_epoch||0) < Math.floor(Date.now()/1000) - 2400;
   document.getElementById("age").textContent = ago(d.updated_epoch||0);
   document.getElementById("status").innerHTML = stale
-    ? '<span class="dot stale"></span>STALE — PC logger not updating (' + esc(ago(d.updated_epoch||0)) + ' old data)'
+    ? '<span class="dot stale"></span>STALE — feed not updating (' + esc(ago(d.updated_epoch||0)) + ' old data)'
     : '<span class="dot"></span>live · updated ' + esc(ago(d.updated_epoch||0)) + ' · ' + esc(d.updated || "");
 
   const hours = (d.today && d.today.hours) || Array(24).fill(null);
@@ -251,19 +252,17 @@ function render(d){
   }).join("") : '<tr><td colspan="5">no cycles yet</td></tr>';
 }
 
-fetch("data.json?ts=" + Date.now()).then(r=>r.json()).then(d=>{
-  // live tank overlay: 1-minute updates straight from the ESP bot via Firebase
-  return fetch(FB + "/tank/latest.json?ts=" + Date.now())
-    .then(r=>r.json())
-    .then(fb=>{
-      if (fb && fb.ts && (Date.now()/1000 - fb.ts) < 600 && fb.online) {
-        d.tank = {level: fb.lvl, liters: Math.round(fb.lvl * 19.5),
-                  pump: fb.pump, capacity_l: 1950,
-                  age_min: Math.round((Date.now()/1000 - fb.ts)/60), live: true};
-      }
-    })
-    .catch(()=>{})
-    .then(()=>d);                     // always pass the data through
+// PC-free: everything comes from Firebase (battery ESP polls the tank ESP)
+Promise.all([
+  fetch(FB + "/tank/latest.json?ts=" + Date.now()).then(r=>r.json()),
+  fetch(FB + '/tank_history.json?orderBy="$key"&limitToLast=4320&ts=' + Date.now()).then(r=>r.json())
+]).then(([latest, h])=>{
+  const hist = h ? Object.keys(h).sort().map(k=>h[k]) : [];
+  if (hist.length < 20) {
+    // fallback: PC-logger era data
+    return fetch("data.json?ts=" + Date.now()).then(r=>r.json());
+  }
+  return buildDataFromFirebase(latest, hist);
 }).then(d=>{
   render(d);
 }).catch(e=>{
