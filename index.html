@@ -180,11 +180,14 @@ function analyze(rows) {
       const a = seg[i - 1], b = seg[i];
       if (a.lvl === null || b.lvl === null) continue;
       if (b.lvl - a.lvl > 0.8) {
-        if (!f) f = { s: a.ts, e: b.ts };
-        else f.e = b.ts;
-      } else if (f && b.ts - f.e > 600) { fills.push(f); f = null; }
+        if (!f) f = { s: a.ts, e: b.ts, l0: a.lvl, l1: b.lvl };
+        else { f.e = b.ts; f.l1 = Math.max(f.l1, b.lvl); }
+      } else if (f && b.ts - f.e > 600) {
+        if (f.l1 - f.l0 >= 3) fills.push(f);   // ignore sub-3% bounce "fills"
+        f = null;
+      }
     }
-    if (f) fills.push(f);
+    if (f) { if (f.l1 - f.l0 >= 3) fills.push(f); f = null; }
     for (let x = 0; x <= fills.length; x++) {
       const wStart = x === 0 ? seg[0].ts : fills[x - 1].e;
       const wEnd = x === fills.length ? seg[seg.length - 1].ts : fills[x].s;
