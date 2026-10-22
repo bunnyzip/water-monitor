@@ -105,10 +105,24 @@ MAHMUD MONITOR • tank 2,000 L (100% = 1,950 L)</div>
 // computed client-side from the battery ESP's tank feed (60s resolution).
 // 1% of tank = 19.5 L (1950 L at 100%).
 
+const MACS = { 1: "A5:C2:37:47:3C:37", 2: "A5:C2:37:47:31:1B" };
+
+// normalize a record: accept the NEW 4-column bot format
+// {timestamp_iso, pct, pump, mode} and the OLD {ts, lvl}
+function normRec(r) {
+  if (r && r.pct !== undefined && r.timestamp_iso) {
+    const t = new Date(r.timestamp_iso).getTime() / 1000;
+    if (isFinite(t)) return { ts: t, lvl: r.pct, pump: r.pump, mode: r.mode };
+  }
+  return r;
+}
+
 function buildDataFromFirebase(latest, hist) {
   const L = 19.5;                       // liters per percent
   const CAP = 1950;
   const nowS = Math.floor(Date.now() / 1000);
+  latest = normRec(latest);
+  hist = (hist || []).map(normRec);
   const dkey = ts => { const d = new Date(ts * 1000); return d.getFullYear() + "-" +
     String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
   const hOfDay = ts => new Date(ts * 1000).getHours();
