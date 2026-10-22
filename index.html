@@ -2,30 +2,33 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="refresh" content="120">
+<meta http-equiv="refresh" content="600">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MAHMUD MONITOR — Water Usage Report (Live)</title>
+<title>MAHMUD MONITOR — Water Usage Report</title>
 <style>
 * { box-sizing: border-box; }
 body { margin:0; font-family:'Segoe UI',Arial,sans-serif; background:linear-gradient(135deg,#0f2027,#203a43 50%,#2c5364); min-height:100vh; color:#263238; }
-.wrap { max-width:900px; margin:0 auto; padding:18px 14px 40px; }
-.hero { background:linear-gradient(90deg,#00c6ff,#0072ff,#00c6ff); border-radius:14px; padding:18px 22px; box-shadow:0 4px 18px rgba(0,0,0,.45); margin-bottom:18px; }
-.hero h2 { margin:0; color:#fff; font-size:22px; text-shadow:0 1px 3px rgba(0,0,0,.4); }
-.hero .gen { color:#e3f2fd; font-size:13px; margin-top:4px; }
-.card { background:#fff; border-radius:12px; padding:14px 18px; margin-bottom:18px; box-shadow:0 3px 12px rgba(0,0,0,.35); }
-.card h3 { margin:0 0 10px; color:#0d47a1; font-size:17px; border-bottom:3px solid #00c6ff; display:inline-block; padding-bottom:2px; }
+.wrap { max-width:920px; margin:0 auto; padding:16px 12px 40px; }
+.hero { background:linear-gradient(90deg,#00c6ff,#0072ff,#00c6ff); border-radius:14px; padding:16px 22px; box-shadow:0 4px 18px rgba(0,0,0,.45); margin-bottom:16px; }
+.hero h2 { margin:0; color:#fff; font-size:21px; text-shadow:0 1px 3px rgba(0,0,0,.4); }
+.hero .gen { color:#e3f2fd; font-size:12.5px; margin-top:4px; }
+.card { background:#fff; border-radius:14px; padding:14px 18px; margin-bottom:16px; box-shadow:0 3px 12px rgba(0,0,0,.35); }
+.card h3 { margin:0 0 12px; color:#0d47a1; font-size:17px; border-bottom:3px solid #00c6ff; display:inline-block; padding-bottom:2px; }
 .grid { display:flex; gap:12px; flex-wrap:wrap; }
 .tile { flex:1 1 150px; background:#e3f2fd; border-radius:10px; padding:12px 14px; text-align:center; }
 .tile .v { font-size:24px; font-weight:800; color:#0d47a1; }
 .tile .l { font-size:12px; color:#546e7a; }
-.big { font-size:34px; font-weight:900; color:#1b5e20; }
-.eta { background:linear-gradient(90deg,#fff3e0,#ffe0b2); border-radius:8px; padding:8px 14px; margin-top:10px; color:#bf360c; font-weight:bold; font-size:14px; }
+.liters { background:#e8f5e9; border:2px solid #66bb6a; }
+.liters .v { font-size:32px; font-weight:900; color:#1b5e20; }
+.eta { background:linear-gradient(90deg,#fff3e0,#ffe0b2); border-radius:8px; padding:8px 14px; margin-top:10px; color:#bf360c; font-weight:bold; font-size:13.5px; }
+.ktile { flex:1 1 170px; border-radius:10px; padding:10px 12px; text-align:center; color:#fff; font-size:13px; font-weight:600; }
+.ktile b { display:block; font-size:16px; margin-bottom:2px; }
 table { border-collapse:collapse; width:100%; font-size:13.5px; }
 th { background:#1565c0; color:#fff; padding:6px 10px; text-align:left; }
 td { padding:6px 10px; }
 tr:nth-child(even) td { background:#e3f2fd; }
 td.deep { color:#1a237e; font-weight:600; }
-.pill2 { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:bold; color:#fff; }
+.pill2 { display:inline-block; padding:2px 12px; border-radius:10px; font-size:12px; font-weight:bold; color:#fff; }
 .pill2.good { background:#2e7d32; }
 .pill2.bad { background:#e53935; }
 .cap { font-size:12px; color:#546e7a; margin:6px 0 0; }
@@ -33,11 +36,15 @@ td.deep { color:#1a237e; font-weight:600; }
 .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; background:#2ecc71; }
 .dot.bad { background:#e74c3c; }
 .foot { text-align:center; color:#b0bec5; font-size:12px; margin-top:8px; }
+.exp-head { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+.exp-head .arrow { width:36px; height:36px; border-radius:8px; border:none; background:#1565c0; color:#fff; font-size:18px; cursor:pointer; font-weight:bold; }
+.exp-head .arrow:disabled { background:#b0bec5; cursor:default; }
+.exp-head .exp-title { flex:1; text-align:center; font-size:16px; font-weight:800; color:#0d47a1; }
 </style>
 </head>
 <body>
 <div class="wrap">
-<div class="hero"><h2>💧 MAHMUD MONITOR — Water Usage Report (Live)</h2>
+<div class="hero"><h2>💧 MAHMUD MONITOR — Water Usage Report</h2>
 <div class="gen" id="gen">loading…</div></div>
 <div class="status" id="status"><span class="dot"></span>loading Firebase…</div>
 
@@ -45,17 +52,18 @@ td.deep { color:#1a237e; font-weight:600; }
 <h3>🔴 Live right now</h3>
 <div class="grid" id="livegrid"></div>
 <div class="eta" id="eta">🔮 …</div>
+<div class="cap" id="livecap"></div>
 </div>
 
 <div class="card">
 <h3>🕐 When is water used most? (avg liters per hour)</h3>
 <div id="avgchart"></div>
-<div class="cap">average of all logged days • red = peak hours • blue = quietest • gray = no data that hour</div>
+<div class="cap" id="avgcap"></div>
 </div>
 
 <div class="card">
 <h3>📌 Key numbers</h3>
-<div id="keynums"></div>
+<div class="grid" id="keynums"></div>
 </div>
 
 <div class="card">
@@ -75,10 +83,21 @@ td.deep { color:#1a237e; font-weight:600; }
 
 <div class="card">
 <h3>📅 Daily summary</h3>
-<table><thead><tr><th>Date</th><th>Total used</th><th>Pump fills</th></tr></thead><tbody id="daily"></tbody></table>
+<table><thead><tr><th>Date</th><th>Readings</th><th>Level range</th><th>Cycles</th></tr></thead><tbody id="daily"></tbody></table>
 </div>
 
-<div class="foot">Tank ESP → battery ESP bot → Firebase → this page • refreshes every 2 min • PC not required • tank 2,000 L (100% = 1,950 L)</div>
+<div class="card">
+<h3>📅 Daily water usage (day by day)</h3>
+<div class="exp-head">
+<button class="arrow" id="prevbtn" onclick="expShift(-1)">◀</button>
+<div class="exp-title" id="exptitle">—</div>
+<button class="arrow" id="nextbtn" onclick="expShift(1)">▶</button>
+</div>
+<div id="expchart"></div>
+<div class="cap" id="expcap">◀ previous day • next day ▶ • liters above each bar, time inside the bar</div>
+</div>
+
+<div class="foot">Tank ESP → battery ESP bot → Firebase → this page • auto-refreshes every 10 min • PC not required • tank 2,000 L (100% = 1,950 L)</div>
 </div>
 
 <script>
@@ -97,12 +116,14 @@ function normRec(r) {
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 function h12(h) { return ((h % 12) || 12) + " " + (h < 12 ? "AM" : "PM"); }
 function ago(ep) { const s = Math.floor(Date.now() / 1000) - ep;
-  if (s < 90) return s + "s"; if (s < 5400) return Math.floor(s / 60) + "m";
+  if (s < 90) return s + "m"; if (s < 5400) return Math.floor(s / 60) + "m";
   if (s < 86400) return Math.floor(s / 3600) + "h"; return Math.floor(s / 86400) + "d"; }
 function fmtL(n) { return Math.round(n).toLocaleString(); }
 function dkey(ts) { const d = new Date(ts * 1000);
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 function fday(d) { return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
+function fdayLong(d) { return new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }); }
+function ftime(ts) { return new Date(ts * 1000).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); }
 
 function analyze(rows) {
   const segs = []; let cur = [rows[0]];
@@ -112,18 +133,33 @@ function analyze(rows) {
   }
   if (cur.length) segs.push(cur);
 
-  // smooth isolated spikes (>5 pts from both neighbors)
+  let biggestGlitch = 0, glitchTs = null;
   for (const seg of segs)
     for (let k = 1; k < seg.length - 1; k++) {
       const lv = seg[k].lvl, la = seg[k - 1].lvl, lb = seg[k + 1].lvl;
-      if (lv !== null && la !== null && lb !== null && Math.abs(lv - la) > 5 && Math.abs(lv - lb) > 5)
+      if (lv !== null && la !== null && lb !== null && Math.abs(lv - la) > 5 && Math.abs(lv - lb) > 5) {
+        biggestGlitch = Math.max(biggestGlitch, Math.abs(lv - la));
+        glitchTs = seg[k].ts;
         seg[k].lvl = Math.round(((la + lb) / 2) * 10) / 10;
+      }
     }
 
-  // cycles (level-rise runs; pump text flickers at 1-min sampling)
+  // cycles: level-rise runs (pump text flickers at 1-min sampling)
   const cycles = [], delivered = {};
   for (const seg of segs) {
     let cyc = null;
+    const close = () => {
+      if (!cyc) return;
+      const dur = Math.max(1, Math.round((cyc.e - cyc.s) / 60));
+      const dl = cyc.l1 - cyc.l0;
+      if (dl >= 3) {
+        const liters = dl * L;
+        const abn = dur < 5 || dur > 40 || dl > 30;
+        cycles.push({ s: cyc.s, e: cyc.e, dur, l0: cyc.l0, l1: cyc.l1, dl, liters, abn });
+        if (!abn && dl >= 8) delivered[dkey(cyc.s)] = (delivered[dkey(cyc.s)] || 0) + liters;
+      }
+      cyc = null;
+    };
     for (let i = 1; i < seg.length; i++) {
       const a = seg[i - 1], b = seg[i];
       if (a.lvl === null || b.lvl === null) continue;
@@ -131,35 +167,15 @@ function analyze(rows) {
       if (diff > 0.8) {
         if (!cyc) cyc = { s: a.ts, e: b.ts, l0: a.lvl, l1: b.lvl };
         else { cyc.e = b.ts; cyc.l1 = Math.max(cyc.l1, b.lvl); }
-      } else if (cyc && b.ts - cyc.e > 600) {          // 10 min without a rise = fill over
-        const dur = Math.max(1, Math.round((cyc.e - cyc.s) / 60));
-        const dl = cyc.l1 - cyc.l0;
-        if (dl >= 3) {                                 // ignore sub-3% sensor bounce
-          const liters = dl * L;
-          const abn = dur < 5 || dur > 40 || dl > 30;
-          cycles.push({ s: cyc.s, e: cyc.e, dur, l0: cyc.l0, l1: cyc.l1, dl, liters, abn });
-          if (!abn && dl >= 8) delivered[dkey(cyc.s)] = (delivered[dkey(cyc.s)] || 0) + liters;
-        }
-        cyc = null;
-      }
+      } else if (cyc && b.ts - cyc.e > 600) close();
     }
-    if (cyc) {
-      const dur = Math.max(1, Math.round((cyc.e - cyc.s) / 60));
-      const dl = cyc.l1 - cyc.l0;
-      if (dl >= 3) {
-        const abn = dur < 5 || dur > 40 || dl > 30;
-        cycles.push({ s: cyc.s, e: cyc.e, dur, l0: cyc.l0, l1: cyc.l1, dl, liters: dl * L, abn });
-        if (!abn && dl >= 8) delivered[dkey(cyc.s)] = (delivered[dkey(cyc.s)] || 0) + dl * L;
-      }
-    }
+    close();
   }
 
-  // drain windows: stretches BETWEEN fill intervals, settle skip 12 min
+  // drain windows: stretches between fill intervals, settle skip 12 min
   const dayRaw = {};
   for (const seg of segs) {
-    // find fill intervals [start,end] in this segment
-    const fills = [];
-    let f = null;
+    const fills = []; let f = null;
     for (let i = 1; i < seg.length; i++) {
       const a = seg[i - 1], b = seg[i];
       if (a.lvl === null || b.lvl === null) continue;
@@ -169,15 +185,13 @@ function analyze(rows) {
       } else if (f && b.ts - f.e > 600) { fills.push(f); f = null; }
     }
     if (f) fills.push(f);
-    // drain windows between fills
     for (let x = 0; x <= fills.length; x++) {
       const wStart = x === 0 ? seg[0].ts : fills[x - 1].e;
       const wEnd = x === fills.length ? seg[seg.length - 1].ts : fills[x].s;
-      if (wEnd - wStart < 1800) continue;             // too short to matter
-      const t0 = wStart + 720;                        // settle skip (12 min)
+      if (wEnd - wStart < 1800) continue;
+      const t0 = wStart + 720;
       const dur = wEnd - t0;
-      if (dur < 1080) continue;                       // < 18 min post-settle
-      // levels at the edges (nearest non-null row)
+      if (dur < 1080) continue;
       const at = ts => { let best = null;
         for (const r of seg) { if (r.lvl !== null && Math.abs(r.ts - ts) <= 300) best = r; if (r.ts > ts + 300) break; }
         return best; };
@@ -185,7 +199,7 @@ function analyze(rows) {
       if (!r0 || !r1) continue;
       const drop = r0.lvl - r1.lvl;
       if (drop < 0 || drop > 40) continue;
-      const rate = drop / (dur / 3600);               // %/h
+      const rate = drop / (dur / 3600);
       let t = t0;
       while (t < wEnd) {
         const d = new Date(t * 1000), h = d.getHours();
@@ -198,15 +212,56 @@ function analyze(rows) {
       }
     }
   }
-  return { rows, cycles, delivered, dayRaw, segs };
+  return { rows, cycles, delivered, dayRaw, segs, biggestGlitch, glitchTs };
 }
 
-function render(A) {
+// ---------- global state ----------
+let DAYS = {};          // dateKey -> {hours:[24|null], total}
+let DAYKEYS = [];       // sorted
+let expIdx = 0;
+
+function bars24(vals, maxv) {
+  const have = vals.map((v, i) => v !== null ? i : -1).filter(i => i >= 0);
+  const sorted = have.slice().sort((a, b) => vals[b] - vals[a]);
+  const reds = new Set(sorted.slice(0, 3));
+  let s = '<svg viewBox="0 0 860 250" width="100%">';
+  vals.forEach((v, h) => {
+    const x = 18 + h * 34;
+    if (v === null) {
+      s += `<rect fill="#cfd8dc" x="${x}" y="168" width="26" height="56" rx="4"/>`;
+      s += `<text x="${x+13}" y="222" transform="rotate(-90 ${x+13} 222)" text-anchor="start" font-size="10.5" fill="#78909c" font-weight="bold">NO DATA</text>`;
+    } else {
+      const hpx = Math.max(8, v / maxv * 175);
+      const fill = reds.has(h) ? "#ff5252" : "#66bb6a";
+      s += `<rect fill="${fill}" x="${x}" y="${230-hpx}" width="26" height="${hpx}" rx="4"/>`;
+      s += `<text x="${x+13}" y="${230-hpx-6}" text-anchor="middle" font-size="11" fill="#0d47a1" font-weight="bold">${Math.round(v)} L</text>`;
+      s += `<text x="${x+15}" y="226" transform="rotate(-90 ${x+15} 226)" text-anchor="start" font-size="9.5" fill="#ffffff" font-weight="bold">${h12(h)}</text>`;
+    }
+  });
+  return s + "</svg>";
+}
+
+function expShift(dir) {
+  expIdx = Math.min(DAYKEYS.length - 1, Math.max(0, expIdx + dir));
+  renderExp();
+}
+function renderExp() {
+  if (!DAYKEYS.length) return;
+  const dk = DAYKEYS[expIdx];
+  const d = DAYS[dk];
+  const maxv = Math.max(1, ...d.hours.map(v => v || 0));
+  document.getElementById("exptitle").textContent = fdayLong(dk) + " — " + fmtL(d.total) + " L total";
+  document.getElementById("expchart").innerHTML = bars24(d.hours, maxv);
+  document.getElementById("prevbtn").disabled = expIdx === 0;
+  document.getElementById("nextbtn").disabled = expIdx === DAYKEYS.length - 1;
+}
+
+function render(A, shed) {
   const rows = A.rows, cycles = A.cycles, delivered = A.delivered;
   const cur = rows[rows.length - 1];
   const lit = (cur.lvl || 0) * L;
 
-  // ---- per-day anchoring + hourly averages ----
+  // ---- drain analysis + scaling ----
   const daysRawSum = {};
   for (const key in A.dayRaw) {
     const d = key.split("|")[0];
@@ -215,83 +270,111 @@ function render(A) {
   const avgDelivered = Object.keys(delivered).length ?
     Object.values(delivered).reduce((s, v) => s + v, 0) / Object.keys(delivered).length : 0;
   const rawAll = Object.values(daysRawSum).reduce((s, v) => s + v, 0);
-  const gscale = rawAll > 0 ? avgDelivered / (rawAll * L) : 0;   // liters per raw-% share, globally anchored
-  const hourScaled = {};
-  for (const key in A.dayRaw) {
-    hourScaled[key] = A.dayRaw[key] * gscale * L;
-  }
+  const gscale = rawAll > 0 ? avgDelivered / (rawAll * L) : 0;
+  const scaleFor = d => {
+    const del = delivered[d];
+    if (del === undefined) return gscale * L;
+    const rawL = (daysRawSum[d] || 0) * L;
+    return (rawL >= 0.5 * del) ? del / Math.max(0.01, daysRawSum[d]) : gscale * L;
+  };
+  // per-day hour arrays + avg profile
+  const perDayHours = {};
   const hourTot = {}, hourN = {};
-  for (const key in hourScaled) {
-    const h = +key.split("|")[1];
-    hourTot[h] = (hourTot[h] || 0) + hourScaled[key];
+  for (const key in A.dayRaw) {
+    const parts = key.split("|");
+    const d = parts[0], h = +parts[1];
+    const val = A.dayRaw[key] * scaleFor(d);
+    perDayHours[d] = perDayHours[d] || {};
+    perDayHours[d][h] = (perDayHours[d][h] || 0) + val;
+    hourTot[h] = (hourTot[h] || 0) + val;
     hourN[h] = (hourN[h] || 0) + 1;
   }
+  DAYS = {};
+  const allDays = new Set([...Object.keys(daysRawSum), ...Object.keys(delivered)]);
+  for (const d of allDays) {
+    const hours = Array(24).fill(null);
+    let total = 0;
+    for (let h = 0; h < 24; h++) {
+      let v = null;
+      if (perDayHours[d] && perDayHours[d][h] !== undefined) v = Math.round(perDayHours[d][h]);
+      else if (delivered[d] !== undefined) v = 0;   // day logged but no measurable drain = 0 L
+      if (v !== null) { hours[h] = v; total += v; }
+    }
+    if (delivered[d] !== undefined) {
+      // day total = pump-delivered fact
+      const sum = hours.reduce((s, v) => s + (v || 0), 0);
+      if (sum > 0) { const k2 = delivered[d] / sum; for (let h = 0; h < 24; h++) if (hours[h] !== null) hours[h] = Math.round(hours[h] * k2); }
+      total = Math.round(delivered[d]);
+    }
+    DAYS[d] = { hours, total };
+  }
+  DAYKEYS = Object.keys(DAYS).sort();
+  expIdx = DAYKEYS.length - 1;
+  renderExp();
+
   const H24 = []; for (let h = 0; h < 24; h++) H24.push(hourN[h] ? Math.round(hourTot[h] / hourN[h]) : null);
 
   // ---- avg chart ----
   const have = H24.map((v, i) => v !== null ? i : -1).filter(i => i >= 0);
-  const sorted = have.slice().sort((a, b) => H24[b] - H24[a]);
-  const reds = new Set(sorted.slice(0, 3)), blues = new Set(sorted.slice(-3));
   const maxv = Math.max(1, ...have.map(i => H24[i]));
-  let ac = '<svg viewBox="0 0 860 235" width="100%">';
-  H24.forEach((v, h) => {
-    const x = 18 + h * 34;
-    if (v === null) {
-      ac += `<rect fill="#cfd8dc" x="${x}" y="170" width="26" height="50" rx="4"/>`;
-      ac += `<text x="${x+13}" y="222" transform="rotate(-90 ${x+13} 222)" text-anchor="start" font-size="10" fill="#78909c" font-weight="bold">n/a</text>`;
-    } else {
-      const fill = reds.has(h) ? "#ff5252" : (blues.has(h) && have.length >= 7 ? "#40c4ff" : "#66bb6a");
-      const hpx = Math.max(6, v / maxv * 160);
-      ac += `<rect fill="${fill}" x="${x}" y="${222-hpx}" width="26" height="${hpx}" rx="4"/>`;
-      ac += `<text x="${x+13}" y="${222-hpx-5}" text-anchor="middle" font-size="10.5" fill="#0d47a1" font-weight="bold">${v} L</text>`;
-    }
-    ac += `<text x="${x+13}" y="234" font-size="9.5" fill="#546e7a" text-anchor="middle">${h12(h)}</text>`;
-  });
-  document.getElementById("avgchart").innerHTML = ac + "</svg>";
+  document.getElementById("avgchart").innerHTML = bars24(H24, maxv);
+  document.getElementById("avgcap").innerHTML = "Average across " + DAYKEYS.map(fday).join(", ") +
+    " • total " + fmtL(avgDelivered) + " L • Empty bars = no data • The average updates automatically as more days come in • Red = peak hours, Green = normal";
 
   // ---- live card ----
-  let liveHtml =
-    '<div class="tile" style="flex:0 0 210px; background:#e8f5e9;"><div class="v big" style="color:#1b5e20;">' +
-    fmtL(lit) + ' L</div><div class="l">water stored (' + (cur.lvl ?? 0).toFixed(1) + '% of ' + CAP.toLocaleString() + ' L)</div></div>' +
-    '<div class="tile"><div class="v" style="font-size:20px;">' + esc(cur.pump) + '</div><div class="l">pump state</div></div>' +
-    '<div class="tile"><div class="v">' + esc(cur.mode) + '</div><div class="l">mode</div></div>' +
-    '<div class="tile"><div class="v">' + ago(Math.floor(cur.ts)) + '</div><div class="l">data age (ESP bot)</div></div>';
-  document.getElementById("livegrid").innerHTML = liveHtml;
-
-  // next-fill ETA
-  let etaTxt = "level above fill trigger (60%)";
+  const level = cur.lvl ?? 0;
+  let curUse = null;
   const stretch = [];
   for (let k = rows.length - 1; k >= 0; k--) {
-    if (rows[k].pump === "OFF") { stretch.unshift(rows[k]); if (cur.ts - rows[k].ts > 2700) break; }
+    if (rows[k].pump === "OFF") { stretch.unshift(rows[k]); if (cur.ts - rows[k].ts > 3600) break; }
     else break;
   }
   if (stretch.length >= 2) {
-    const dt = (stretch[stretch.length - 1].ts - stretch[0].ts) / 3600;
-    const rate = dt > 0 ? (stretch[0].lvl - stretch[stretch.length - 1].lvl) / dt : 0;
-    if (cur.lvl <= 60) etaTxt = rate > 0.05 ? "🚰 fill soon — level " + cur.lvl.toFixed(1) + "% falling " + (rate * L).toFixed(0) + " L/h" : "⏳ measuring…";
-    else if (rate > 0.05) etaTxt = "🔮 at " + (rate * L).toFixed(0) + " L/h, next fill (60%) in ≈ " + ((cur.lvl - 60) / rate).toFixed(1) + " h";
+    const t0 = stretch[0].ts + 720;
+    const dur = cur.ts - t0;
+    if (dur >= 1080) {
+      const drop = stretch[0].lvl - cur.lvl;
+      if (drop >= 0 && drop <= 40) curUse = Math.max(0, drop / (dur / 3600) * L);
+    }
   }
-  document.getElementById("eta").innerHTML = "🔮 " + etaTxt + " &nbsp;|&nbsp; powered by the ESP bot • IPS backup power";
+  let liveHtml =
+    '<div class="tile liters" style="flex:0 0 190px;"><div class="v">' + fmtL(lit) + ' L</div><div class="l">water stored</div></div>' +
+    '<div class="tile"><div class="v" style="font-size:20px;">' + esc(cur.pump) + '</div><div class="l">pump state</div></div>' +
+    '<div class="tile"><div class="v">' + (curUse === null ? "— measuring" : Math.round(curUse) + " L/h") + '</div><div class="l">current usage</div></div>' +
+    '<div class="tile"><div class="v">' + ago(Math.floor(cur.ts)) + '</div><div class="l">data age</div></div>';
+  document.getElementById("livegrid").innerHTML = liveHtml;
+
+  // ETA line
+  let etaTxt;
+  if (level <= 60) {
+    etaTxt = "🚰 fill imminent — level " + level.toFixed(0) + "% and falling";
+  } else if (curUse !== null && curUse > 1) {
+    const hrs = (level - 60) / (curUse / L);
+    const eta = new Date(Date.now() + hrs * 3600000);
+    etaTxt = "🔮 at " + Math.round(curUse) + " L/h → next fill (60%) " + (hrs >= 24 ? "≈ " + Math.round(hrs / 24) + " days from now (" + eta.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + ")" : "in ≈ " + eta.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
+  } else {
+    etaTxt = "🔮 level " + level.toFixed(0) + "% — measuring usage for the next-fill estimate";
+  }
+  document.getElementById("eta").innerHTML = etaTxt;
+  const peakEver = Math.max(...rows.map(r => r.lvl || 0));
+  document.getElementById("livecap").innerHTML = level.toFixed(1) + "% of " + CAP.toLocaleString() + " L (max " + peakEver.toFixed(0) + "% in the logged period) • mode " + esc(cur.mode);
 
   // ---- key numbers ----
+  let night = [], day = [];
+  for (const h in hourTot) (h >= 22 || h < 6 ? night : day).push(hourTot[h] / hourN[h]);
+  const avg = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0;
+  const sortedH = have.slice().sort((a, b) => H24[b] - H24[a]);
+  const peakH = sortedH[0] !== undefined ? sortedH[0] : 0;
+  const totalPctDay = avgDelivered / CAP * 100;
   const dayCounts = {};
   cycles.forEach(c => { const dk = dkey(c.s); dayCounts[dk] = (dayCounts[dk] || 0) + 1; });
   const busiest = Object.keys(dayCounts).sort((a, b) => dayCounts[b] - dayCounts[a])[0];
-  const abn = cycles.filter(c => c.abn).length;
-  const avgFill = cycles.length ? cycles.reduce((s, c) => s + c.dur, 0) / cycles.length : 0;
-  let night = [], day = [];
-  for (const key in hourScaled) {
-    const hh = +key.split("|")[1];
-    (hh >= 22 || hh < 6 ? night : day).push(hourScaled[key]);
-  }
-  const avg = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0;
   document.getElementById("keynums").innerHTML =
-    '<div class="grid">' +
-    '<div class="tile"><div class="v" style="font-size:17px;">' + (busiest ? fday(busiest) : "—") + '</div><div class="l">busiest day (' + (busiest ? dayCounts[busiest] : 0) + ' fills)</div></div>' +
-    '<div class="tile"><div class="v">' + cycles.length + '</div><div class="l">pump cycles (' + (cycles.length - abn) + ' ✔ / ' + abn + ' ⚠)</div></div>' +
-    '<div class="tile"><div class="v">' + avgFill.toFixed(0) + ' min</div><div class="l">avg fill</div></div>' +
-    '<div class="tile"><div class="v" style="font-size:17px;">🌙 ' + avg(night).toFixed(0) + ' / ☀ ' + avg(day).toFixed(0) + ' L/h</div><div class="l">night vs day usage</div></div>' +
-    '<div class="tile" style="flex:1 1 100%; background:#e8f5e9;"><div class="v" style="font-size:17px; color:#2e7d32;">✅ avg daily ≈ ' + fmtL(avgDelivered) + ' L</div><div class="l">= water the pump delivered (anchored fact)</div></div></div>';
+    '<div class="ktile" style="background:#5c6bc0;"><b>🌙 ' + Math.round(avg(night)) + ' L/h</b>night drain (10 PM – 6 AM)</div>' +
+    '<div class="ktile" style="background:#26a69a;"><b>☀ ' + Math.round(avg(day)) + ' L/h</b>day usage (6 AM – 10 PM)</div>' +
+    '<div class="ktile" style="background:#ef5350;"><b>' + h12(peakH) + ' = ' + (H24[peakH] || 0) + ' L</b>peak hour (average)</div>' +
+    '<div class="ktile" style="background:#66bb6a; color:#1b5e20;"><b>' + totalPctDay.toFixed(1) + '% = ' + fmtL(avgDelivered) + ' L/day</b>total usage per day</div>' +
+    '<div class="ktile" style="flex:1 1 100%; background:#e8f5e9; color:#1b5e20;"><b>✅ Sanity: ' + fmtL(avgDelivered) + ' L/day = pump delivered (verified math)</b>hourly bars average to this total — liters the pump actually delivered</div>';
 
   // ---- health ----
   let gaps = 0, bigGap = 0;
@@ -299,49 +382,67 @@ function render(A) {
     const g = rows[i].ts - rows[i - 1].ts;
     if (g > 1800) { gaps++; bigGap = Math.max(bigGap, g); }
   }
+  const span = rows[rows.length - 1].ts - rows[0].ts;
+  let cov = 0;
+  for (let i = 1; i < rows.length; i++) if (rows[i].ts - rows[i - 1].ts <= 1800) cov += rows[i].ts - rows[i - 1].ts;
+  const coverage = span > 0 ? cov / span * 100 : 0;
+  const spanH = Math.floor(span / 3600), spanM = Math.round(span % 3600 / 60);
+  const covH = Math.floor(cov / 3600), covM = Math.round(cov % 3600 / 60);
+  let shedHtml = '<tr><td>Load shedding captured</td><td>' + (shed ? '~' + shed + ' min total (from battery drain)' : '— (battery history unavailable)') + '</td></tr>';
   document.getElementById("health").innerHTML =
-    '<tr><td>Logging coverage</td><td>' + Math.round(100 - Math.min(100, gaps * 2)) + '% of ' + ago(Math.floor(rows[0].ts)) + ' period</td></tr>' +
-    '<tr><td>Logging gaps (&gt;30 min)</td><td>' + gaps + ' (biggest ' + Math.round(bigGap / 60) + ' min)</td></tr>' +
-    '<tr><td>Data age (ESP bot)</td><td>' + ago(Math.floor(cur.ts)) + ' ago</td></tr>' +
-    '<tr><td>Source</td><td>Tank ESP → ESP bot → Firebase (1-min reads, PC-free)</td></tr>';
+    '<tr><td>ESP32 gaps / dropouts</td><td>' + gaps + ' gap(s) &gt;30 min (biggest ' + Math.round(bigGap / 60) + ' min) — nightly 3:15 AM rest is expected</td></tr>' +
+    shedHtml +
+    '<tr><td>Logging coverage</td><td>' + coverage.toFixed(0) + '% of period (' + covH + ':' + String(covM).padStart(2, "0") + 'h of ' + spanH + ':' + String(spanM).padStart(2, "0") + 'h)</td></tr>' +
+    '<tr><td>Logging gaps</td><td>' + gaps + '</td></tr>' +
+    '<tr><td>Data age</td><td>' + ago(Math.floor(cur.ts)) + ' ago (bot live feed updates every minute)</td></tr>';
 
   // ---- records ----
   const nor = cycles.filter(c => !c.abn);
   const fastest = nor.length ? nor.reduce((a, b) => a.dur < b.dur ? a : b) : null;
   const longest = cycles.length ? cycles.reduce((a, b) => a.dur > b.dur ? a : b) : null;
   document.getElementById("records").innerHTML =
-    '<tr><td>⚡ Fastest fill</td><td>' + (fastest ? fastest.dur + ' min (' + fday(dkey(fastest.s)) + ', ' + fmtL(fastest.liters) + ' L)' : '—') + '</td></tr>' +
-    '<tr><td>🐢 Longest fill</td><td>' + (longest ? longest.dur + ' min (' + fday(dkey(longest.s)) + ', ' + fmtL(longest.liters) + ' L)' : '—') + '</td></tr>' +
-    '<tr><td>🔥 Busiest day</td><td>' + (busiest ? fday(busiest) + ' — ' + dayCounts[busiest] + ' fills' : '—') + '</td></tr>' +
-    '<tr><td>📈 Days monitored</td><td>' + Object.keys(dayCounts).length + '</td></tr>';
+    '<tr><td>⚡ Fastest fill</td><td>' + (fastest ? fastest.dur + ' min (' + ftime(fastest.s) + ')' : '—') + '</td></tr>' +
+    '<tr><td>🐢 Longest fill</td><td>' + (longest ? longest.dur + ' min (' + fday(dkey(longest.s)) + ')' : '—') + '</td></tr>' +
+    '<tr><td>📈 Biggest sensor glitch</td><td>' + (A.biggestGlitch > 0 ? A.biggestGlitch.toFixed(1) + '% jump (' + fday(dkey(A.glitchTs)) + ') — auto-corrected' : 'none 🎉') + '</td></tr>' +
+    '<tr><td>🔥 Busiest day</td><td>' + (busiest ? fday(busiest) + ' — ' + dayCounts[busiest] + ' cycles' : '—') + '</td></tr>';
 
   // ---- cycles table ----
-  document.getElementById("cycles").innerHTML = cycles.length ? cycles.slice(-20).reverse().map(c => {
+  document.getElementById("cycles").innerHTML = cycles.length ? cycles.slice(-15).reverse().map(c => {
     const st = c.abn ? '<span class="pill2 bad">⚠ abnormal</span>' : '<span class="pill2 good">✔ normal</span>';
-    const s0 = new Date(c.s * 1000), e0 = new Date(c.e * 1000);
-    const f = d => d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-    return '<tr><td class="deep">' + f(s0) + '</td><td class="deep">' + f(e0) + '</td><td class="deep">' +
-      c.dur + ' min</td><td class="deep">' + (c.l0 ?? "?") + ' → ' + (c.l1 ?? "?") + '% <b style="color:#1565c0">' +
-      fmtL(c.liters) + ' L</b></td><td>' + st + '</td></tr>';
+    return '<tr><td class="deep">' + ftime(c.s) + '</td><td class="deep">' + ftime(c.e) + '</td><td class="deep">' +
+      c.dur + ' min</td><td class="deep">' + (c.l0 ?? "?") + '–' + (c.l1 ?? "?") + '% (+' + c.dl.toFixed(1) + '%) <b style="color:#1565c0">(' + fmtL(c.liters) + ' L)</b></td><td>' + st + '</td></tr>';
   }).join("") : '<tr><td colspan="5">no cycles yet</td></tr>';
 
   // ---- daily summary ----
-  document.getElementById("daily").innerHTML = Object.keys(delivered).sort().reverse().map(dk =>
-    '<tr><td class="deep">' + fday(dk) + '</td><td class="deep">' + fmtL(delivered[dk]) + ' L</td><td class="deep">' +
-    dayCounts[dk] + ' fill(s)</td></tr>').join("");
+  const dayRead = {};
+  rows.forEach(r => { const dk = dkey(r.ts); dayRead[dk] = (dayRead[dk] || 0) + 1; });
+  const dayRange = {};
+  rows.forEach(r => {
+    const dk = dkey(r.ts);
+    if (r.lvl === null) return;
+    dayRange[dk] = dayRange[dk] || [999, -1];
+    dayRange[dk][0] = Math.min(dayRange[dk][0], r.lvl);
+    dayRange[dk][1] = Math.max(dayRange[dk][1], r.lvl);
+  });
+  document.getElementById("daily").innerHTML = DAYKEYS.slice().reverse().map(dk =>
+    '<tr><td class="deep">' + fday(dk) + '</td><td class="deep">' + (dayRead[dk] || 0) + '</td><td class="deep">' +
+    (dayRange[dk] ? dayRange[dk][0].toFixed(0) + "%–" + dayRange[dk][1].toFixed(0) + "% (" + fmtL(dayRange[dk][0] * L) + "–" + fmtL(dayRange[dk][1] * L) + " L)" : "—") +
+    '</td><td class="deep">' + (dayCounts[dk] || 0) + ' cycle(s)</td></tr>').join("");
 
   // ---- hero + status ----
-  document.getElementById("gen").innerHTML = "🟢 live from Firebase • updated " +
-    new Date().toLocaleTimeString() + " • " + rows.length.toLocaleString() + " readings • " +
-    Object.keys(dayCounts).length + " days monitored • PC not required";
-  document.getElementById("status").innerHTML =
-    '<span class="dot"></span>live • bot last reported ' + ago(Math.floor(cur.ts)) + ' ago • PC not required';
+  document.getElementById("gen").innerHTML = "Auto-generated at " + new Date().toLocaleTimeString() +
+    " • live from Firebase • " + rows.length.toLocaleString() + " readings • " + DAYKEYS.length + " days monitored • PC not required";
+  const stale = cur.ts < Date.now() / 1000 - 600;
+  document.getElementById("status").innerHTML = stale
+    ? '<span class="dot bad"></span>STALE — bot last reported ' + ago(Math.floor(cur.ts)) + ' ago'
+    : '<span class="dot"></span>live • bot last reported ' + ago(Math.floor(cur.ts)) + ' ago • PC not required';
 }
 
 Promise.all([
   fetch(FB + "/tank/latest.json?ts=" + Date.now()).then(r => r.json()),
-  fetch(FB + "/tank_history.json?ts=" + Date.now()).then(r => r.json())
-]).then(([latest, h]) => {
+  fetch(FB + "/tank_history.json?ts=" + Date.now()).then(r => r.json()),
+  fetch(FB + '/history/1.json?orderBy="$key"&limitToLast=4320&ts=' + Date.now()).then(r => r.json()).catch(() => null)
+]).then(([latest, h, bh]) => {
   const hist = h ? Object.keys(h).sort().map(k => h[k]).map(normRec).filter(Boolean) : [];
   if (hist.length < 20) {
     document.getElementById("status").innerHTML =
@@ -349,12 +450,23 @@ Promise.all([
     document.getElementById("gen").innerHTML = "waiting for data…";
     return;
   }
-  render(hist);
+  // load-shedding minutes from battery history (a < -0.5 A = discharging)
+  let shedMin = null;
+  try {
+    const br = Object.keys(bh || {}).sort().map(k => bh[k]).filter(r => r && isFinite(r.ts) && isFinite(r.a)).sort((a, b) => a.ts - b.ts);
+    let mins = 0;
+    for (let i = 1; i < br.length; i++) {
+      const dt = br[i].ts - br[i - 1].ts;
+      if (dt > 0 && dt <= 300 && br[i].a < -0.5) mins += dt / 60;
+    }
+    shedMin = Math.round(mins);
+  } catch (e) {}
+  render(analyze(hist), shedMin);
 }).catch(e => {
   document.getElementById("status").innerHTML =
     '<span class="dot bad"></span>connection problem — retrying…';
 });
-setInterval(() => location.reload(), 120000);
+setInterval(() => location.reload(), 600000);
 </script>
 </body>
 </html>
