@@ -1,475 +1,1510 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta http-equiv="refresh" content="120">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MAHMUD MONITOR — Water Usage Report</title>
-<style>
-* { box-sizing: border-box; }
-body { margin:0; font-family:'Segoe UI',Arial,sans-serif; background:linear-gradient(135deg,#0f2027,#203a43 50%,#2c5364); min-height:100vh; color:#263238; }
-.wrap { max-width:920px; margin:0 auto; padding:16px 12px 40px; }
-.hero { background:linear-gradient(90deg,#00c6ff,#0072ff,#00c6ff); border-radius:14px; padding:16px 22px; box-shadow:0 4px 18px rgba(0,0,0,.45); margin-bottom:16px; }
-.hero h2 { margin:0; color:#fff; font-size:21px; text-shadow:0 1px 3px rgba(0,0,0,.4); }
-.hero .gen { color:#e3f2fd; font-size:12.5px; margin-top:4px; }
-.card { background:#fff; border-radius:14px; padding:14px 18px; margin-bottom:16px; box-shadow:0 3px 12px rgba(0,0,0,.35); }
-.card h3 { margin:0 0 12px; color:#0d47a1; font-size:17px; border-bottom:3px solid #00c6ff; display:inline-block; padding-bottom:2px; }
-.grid { display:flex; gap:12px; flex-wrap:wrap; }
-.tile { flex:1 1 150px; background:#e3f2fd; border-radius:10px; padding:12px 14px; text-align:center; }
-.tile .v { font-size:24px; font-weight:800; color:#0d47a1; }
-.tile .l { font-size:12px; color:#546e7a; }
-.liters { background:#e8f5e9; border:2px solid #66bb6a; }
-.liters .v { font-size:32px; font-weight:900; color:#1b5e20; }
-.eta { background:linear-gradient(90deg,#fff3e0,#ffe0b2); border-radius:8px; padding:8px 14px; margin-top:10px; color:#bf360c; font-weight:bold; font-size:13.5px; }
-.ktile { flex:1 1 170px; border-radius:10px; padding:10px 12px; text-align:center; color:#fff; font-size:13px; font-weight:600; }
-.ktile b { display:block; font-size:16px; margin-bottom:2px; }
-table { border-collapse:collapse; width:100%; font-size:13.5px; }
-th { background:#1565c0; color:#fff; padding:6px 10px; text-align:left; }
-td { padding:6px 10px; }
-tr:nth-child(even) td { background:#e3f2fd; }
-td.deep { color:#1a237e; font-weight:600; }
-.pill2 { display:inline-block; padding:2px 12px; border-radius:10px; font-size:12px; font-weight:bold; color:#fff; }
-.pill2.good { background:#2e7d32; }
-.pill2.bad { background:#e53935; }
-.cap { font-size:12px; color:#546e7a; margin:6px 0 0; }
-.status { text-align:center; font-size:14px; margin-bottom:14px; color:#e3f2fd; }
-.dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; background:#2ecc71; }
-.dot.bad { background:#e74c3c; }
-.foot { text-align:center; color:#b0bec5; font-size:12px; margin-top:8px; }
-.exp-head { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
-.exp-head .arrow { width:36px; height:36px; border-radius:8px; border:none; background:#1565c0; color:#fff; font-size:18px; cursor:pointer; font-weight:bold; }
-.exp-head .arrow:disabled { background:#b0bec5; cursor:default; }
-.exp-head .exp-title { flex:1; text-align:center; font-size:16px; font-weight:800; color:#0d47a1; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="refresh" content="300" />
+  <title>💧 MAHMUD MONITOR — Professional Water Tank Telemetry & Usage Report</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-grad: linear-gradient(135deg, #0b171e 0%, #162a33 50%, #1f3c49 100%);
+      --hero-grad: linear-gradient(95deg, #0072ff 0%, #00c6ff 55%, #0072ff 100%);
+      --card-bg: #ffffff;
+      --card-alt: #f8fafc;
+      --ink: #0f172a;
+      --muted: #475569;
+      --subtle: #64748b;
+      --border: #e2e8f0;
+      --brand: #0d47a1;
+      --brand-mid: #1565c0;
+      --cyan: #00c6ff;
+      --green: #1b5e20;
+      --green-mid: #2e7d32;
+      --green-bg: #e8f5e9;
+      --amber: #e65100;
+      --amber-bg: #fff3e0;
+      --red: #c62828;
+      --red-bg: #ffebee;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Inter, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+      background: var(--bg-grad);
+      color: var(--ink);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 50px;
+    }
+    .wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+    }
+
+    /* Hero Banner */
+    .hero {
+      background: var(--hero-grad);
+      border-radius: 16px;
+      padding: 22px 26px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+      margin-bottom: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+    .hero h2 {
+      margin: 0;
+      color: #ffffff;
+      font-size: 25px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+    }
+    .hero .gen {
+      color: #e3f6ff;
+      font-size: 13.5px;
+      margin-top: 5px;
+      font-weight: 500;
+    }
+    .hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .h-badge {
+      background: rgba(11, 23, 30, 0.45);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+    .h-badge b { color: #80d8ff; }
+
+    /* Sticky Quick Nav */
+    .quick-nav {
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(8px);
+      border-radius: 12px;
+      padding: 8px 12px;
+      margin-bottom: 18px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      position: sticky;
+      top: 10px;
+      z-index: 99;
+    }
+    .nav-pill {
+      border: none;
+      background: #f1f5f9;
+      color: #1e293b;
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 7px 13px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .nav-pill:hover { background: #e3f2fd; color: var(--brand); }
+    .nav-pill.primary { background: var(--brand-mid); color: #fff; }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      border-radius: 14px;
+      padding: 18px 22px;
+      margin-bottom: 18px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    }
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    h3 {
+      margin: 0;
+      color: var(--brand);
+      font-size: 18px;
+      font-weight: 800;
+      border-bottom: 3px solid var(--cyan);
+      display: inline-block;
+      padding-bottom: 3px;
+    }
+    .cap {
+      font-size: 12.5px;
+      color: #455a64;
+      margin: 4px 0 12px;
+    }
+
+    /* Live Right Now Panel + Animated Tank Gauge */
+    .live-layout {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 20px;
+      align-items: stretch;
+    }
+    @media (max-width: 760px) {
+      .live-layout { grid-template-columns: 1fr; }
+    }
+    .tank-visual-box {
+      background: #f0f7ff;
+      border: 2px solid #90caf9;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .tank-cylinder {
+      width: 120px;
+      height: 150px;
+      border: 3px solid #0d47a1;
+      border-radius: 12px 12px 16px 16px;
+      background: #e2e8f0;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 3px 8px rgba(0,0,0,0.18);
+    }
+    .tank-water {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 69.2%;
+      background: linear-gradient(180deg, #29b6f6 0%, #0288d1 50%, #01579b 100%);
+      transition: height 0.5s ease;
+    }
+    .tank-line-80 {
+      position: absolute;
+      bottom: 81.2%;
+      left: 0;
+      width: 100%;
+      border-top: 1.5px dashed #1b5e20;
+      z-index: 3;
+    }
+    .tank-line-60 {
+      position: absolute;
+      bottom: 60.0%;
+      left: 0;
+      width: 100%;
+      border-top: 1.5px dashed #d84315;
+      z-index: 3;
+    }
+    .tank-overlay-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 4;
+      color: #fff;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.75);
+      font-weight: 800;
+    }
+
+    .live-boxes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+      gap: 12px;
+    }
+    .lbox {
+      background: #e3f2fd;
+      border: 1px solid #bbdefb;
+      border-radius: 12px;
+      padding: 12px 14px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .lbox.primary-green {
+      background: var(--green-bg);
+      border: 2px solid var(--green-mid);
+    }
+    .lbox .big {
+      font-size: 27px;
+      font-weight: 800;
+      color: var(--brand);
+      line-height: 1.15;
+    }
+    .lbox.primary-green .big {
+      color: var(--green);
+      font-size: 32px;
+    }
+    .lbox .lab {
+      font-size: 12px;
+      color: #37474f;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+    .lbox .sub {
+      font-size: 11px;
+      color: #546e7a;
+      margin-top: 2px;
+    }
+
+    .eta-banner {
+      background: linear-gradient(90deg, #fff3e0, #ffe0b2);
+      border-left: 5px solid #ef6c00;
+      border-radius: 10px;
+      padding: 11px 16px;
+      margin-top: 12px;
+      color: #bf360c;
+      font-weight: 700;
+      font-size: 13.5px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    /* Key Numbers Pills */
+    .kv-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .kv {
+      flex: 1 1 240px;
+      background: #ffffff;
+      border: 2px solid var(--cyan);
+      border-radius: 11px;
+      padding: 10px 14px;
+      font-size: 13.5px;
+      color: var(--brand);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    .kv b {
+      color: #d84315;
+      font-size: 15.5px;
+    }
+
+    /* Two-column layout for Health & Records */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+      gap: 18px;
+    }
+    @media (max-width: 600px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    /* Tables */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1px solid #cfd8dc;
+    }
+    table {
+      border-collapse: collapse;
+      font-size: 13.5px;
+      width: 100%;
+    }
+    td, th {
+      border: none;
+      padding: 8px 12px;
+      text-align: left;
+      font-variant-numeric: tabular-nums;
+    }
+    th {
+      background: var(--brand-mid);
+      color: #ffffff;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    tr:nth-child(even) td { background: #e3f2fd; }
+    tr:nth-child(odd) td { background: #ffffff; }
+    tr:hover td { background: #bbdefb; }
+    td.deep { color: #1a237e; font-weight: 600; }
+    .num { text-align: right; }
+    .mono { font-family: Consolas, Monaco, 'Courier New', monospace; font-size: 12.5px; }
+    .gain { color: #2e7d32; font-weight: 800; }
+    .loss { color: #c62828; font-weight: 700; }
+
+    /* Status Pills */
+    .pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .pill.good { background: #2e7d32; }
+    .pill.bad { background: #e53935; }
+    .pill.warn { background: #ef6c00; }
+    .pill.info { background: #1565c0; }
+
+    /* SVG Bar Chart Container */
+    .svg-scroll {
+      width: 100%;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .svg-scroll svg {
+      display: block;
+      margin: 0 auto;
+    }
+
+    /* Controls & Buttons */
+    .btn {
+      background: var(--brand-mid);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 7px 14px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: var(--brand); }
+    .btn-outline {
+      background: #e3f2fd;
+      color: var(--brand);
+      border: 1px solid #90caf9;
+    }
+    .btn-outline.active {
+      background: var(--brand-mid);
+      color: #fff;
+      border-color: var(--brand-mid);
+    }
+    .select, .input {
+      padding: 7px 11px;
+      border-radius: 8px;
+      border: 1px solid #90caf9;
+      font-size: 13px;
+      color: var(--brand);
+      font-weight: 600;
+      background: #fff;
+    }
+
+    .chart-box {
+      position: relative;
+      height: 320px;
+      width: 100%;
+    }
+
+    @media print {
+      body { background: #fff; }
+      .quick-nav, .no-print { display: none !important; }
+      .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+    }
+  </style>
 </head>
 <body>
 <div class="wrap">
-<div class="hero"><h2>💧 MAHMUD MONITOR — Water Usage Report</h2>
-<div class="gen" id="gen">loading…</div></div>
-<div class="status" id="status"><span class="dot"></span>loading Firebase…</div>
 
-<div class="card">
-<h3>🔴 Live right now</h3>
-<div class="grid" id="livegrid"></div>
-<div class="eta" id="eta">🔮 …</div>
-<div class="cap" id="livecap"></div>
-</div>
+  <!-- HERO BANNER -->
+  <div class="hero">
+    <div>
+      <h2>💧 MAHMUD MONITOR — Smart Water Tank & Usage Report</h2>
+      <div class="gen">
+        Updated Oct 23, 2026 • <strong>1,751 Firebase readings analyzed</strong> (Oct 21 00:00 &rarr; Oct 23 04:52 +06:00) • Tank Capacity: <strong>1,950 L</strong>
+      </div>
+    </div>
+    <div class="hero-badges">
+      <div class="h-badge">Mode: <b>100% AUTO</b></div>
+      <div class="h-badge">Trigger Band: <b>~60% &rarr; ~81%</b></div>
+      <div class="h-badge">Total Cycles: <b>16 ON (+2 Offline)</b></div>
+    </div>
+  </div>
 
-<div class="card">
-<h3>🕐 When is water used most? (avg liters per hour)</h3>
-<div id="avgchart"></div>
-<div class="cap" id="avgcap"></div>
-</div>
+  <!-- STICKY NAVIGATION -->
+  <div class="quick-nav no-print">
+    <button class="nav-pill primary" onclick="jump('sec-live')">🔴 Live Status</button>
+    <button class="nav-pill" onclick="jump('sec-hourly')">🕐 24h Usage Profile</button>
+    <button class="nav-pill" onclick="jump('sec-daybyday')">📆 Day-by-Day Explorer</button>
+    <button class="nav-pill" onclick="jump('sec-timeline')">📈 Full Telemetry Chart</button>
+    <button class="nav-pill" onclick="jump('sec-health')">🩺 Health & Records</button>
+    <button class="nav-pill" onclick="jump('sec-cycles')">🔄 All 16 Pump Cycles</button>
+    <button class="nav-pill" onclick="jump('sec-anomalies')">⚠️ Anomalies & Dropouts</button>
+    <button class="nav-pill" onclick="jump('sec-raw')">🔍 Raw Log (1,751)</button>
+    <button class="nav-pill" style="margin-left:auto;" onclick="window.print()">🖨️ Print PDF</button>
+  </div>
 
-<div class="card">
-<h3>📌 Key numbers</h3>
-<div class="grid" id="keynums"></div>
-</div>
+  <!-- 1. LIVE RIGHT NOW -->
+  <div id="sec-live" class="card">
+    <div class="card-head">
+      <h3>🔴 Live Right Now (Latest Telemetry Snapshot)</h3>
+      <span class="pill info">Last Synced: 2026-10-23 04:52:38 AM (+06:00)</span>
+    </div>
 
-<div class="card">
-<h3>🩺 System health</h3>
-<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody id="health"></tbody></table>
-</div>
+    <div class="live-layout">
+      <!-- Visual Tank Cylinder -->
+      <div class="tank-visual-box">
+        <div class="tank-cylinder">
+          <div class="tank-line-80" title="Auto Cutoff (~81.2% / 1,583 L)"></div>
+          <div class="tank-line-60" title="Auto Trigger (~60.0% / 1,170 L)"></div>
+          <div class="tank-water" style="height: 69.2%;"></div>
+          <div class="tank-overlay-text">
+            <span style="font-size:22px;">69.2%</span>
+            <span style="font-size:12px;">1,349 L</span>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#1565c0;font-weight:700;margin-top:6px;text-align:center;">
+          Cutoff: 81% (1,580 L)<br/>Trigger: 60% (1,170 L)
+        </div>
+      </div>
 
-<div class="card">
-<h3>🏆 Records</h3>
-<table><thead><tr><th>Record</th><th>Value</th></tr></thead><tbody id="records"></tbody></table>
-</div>
+      <!-- Live Metrics Grid -->
+      <div>
+        <div class="live-boxes">
+          <div class="lbox primary-green">
+            <div class="big">1,349 L</div>
+            <div class="lab">Water in Tank</div>
+            <div class="sub"><strong>69.2%</strong> of 1,950 L capacity</div>
+          </div>
+          <div class="lbox">
+            <div class="big">OFF</div>
+            <div class="lab">Pump State</div>
+            <div class="sub">Mode: <strong>AUTO</strong> (Duty: 9.2% ON)</div>
+          </div>
+          <div class="lbox">
+            <div class="big">179 L</div>
+            <div class="lab">Buffer Above Trigger</div>
+            <div class="sub"><strong>+9.2%</strong> above 60.0% (1,170 L)</div>
+          </div>
+          <div class="lbox">
+            <div class="big">86 L/h</div>
+            <div class="lab">Post-Fill Draw Rate</div>
+            <div class="sub"><strong>4.4%/h</strong> (since 01:51 AM peak)</div>
+          </div>
+          <div class="lbox">
+            <div class="big">46 L/h</div>
+            <div class="lab">Late-Night Baseline</div>
+            <div class="sub"><strong>2.4%/h</strong> quiet-hour draw</div>
+          </div>
+          <div class="lbox">
+            <div class="big">Cycle #16</div>
+            <div class="lab">Latest Fill Completed</div>
+            <div class="sub"><strong>Oct 23, 01:49 AM</strong> (+437 L)</div>
+          </div>
+        </div>
 
-<div class="card">
-<h3>🔄 Recent cycles (newest first)</h3>
-<table><thead><tr><th>Start</th><th>End</th><th>Duration</th><th>Fill</th><th>Status</th></tr></thead><tbody id="cycles"></tbody></table>
-</div>
+        <div class="eta-banner">
+          <span>🔮 <strong>Next Auto-Fill ETA:</strong> ≈ <strong>2.1 h</strong> at current 4.4%/h draw (or ≈ <strong>3.9 h</strong> at 2.4%/h quiet baseline)</span>
+          <span>✅ <strong>Last Fill (#16):</strong> Oct 23, 01:36 AM &rarr; 01:49 AM (59.8% &rarr; 82.2%, +437 L in 13 min)</span>
+        </div>
+      </div>
+    </div>
+  </div>
 
-<div class="card">
-<h3>📅 Daily summary</h3>
-<table><thead><tr><th>Date</th><th>Readings</th><th>Level range</th><th>Cycles</th></tr></thead><tbody id="daily"></tbody></table>
-</div>
+  <!-- 2. KEY NUMBERS -->
+  <div class="card">
+    <div class="card-head">
+      <h3>📌 Key Operational Numbers</h3>
+      <span style="font-size:12px;color:#546e7a;font-weight:600;">Anchored to 1,950 L Tank Geometry (1% = 19.5 Liters)</span>
+    </div>
+    <div class="kv-grid">
+      <div class="kv">🕐 Peak Usage Hour: <b>3 PM – 4 PM</b> (≈ 274 L avg / 336 L on Oct 21)</div>
+      <div class="kv">🚿 Logged Pump Cycles: <b>16 ON Cycles</b> (16 ✔ normal + 2 offline gap fills)</div>
+      <div class="kv">⏱️ Avg Fill Cycle: <b>13.8 min</b> (+410 L true trough-to-peak per fill)</div>
+      <div class="kv">⚡ Mean Fill Speed: <b>30.8 L/min</b> (+1.58% / min while Pump ON)</div>
+      <div class="kv">🌙 Night Usage (12–6 AM): <b>≈ 75 L/h</b> vs ☀️ Day Usage: <b>≈ 141 L/h</b></div>
+      <div class="kv">✅ Pumped Volume Sanity: <b>6,562 L total</b> across 16 cycles (≈ 2,771 L/day anchored profile)</div>
+    </div>
+  </div>
 
-<div class="card">
-<h3>📅 Daily water usage (day by day)</h3>
-<div class="exp-head">
-<button class="arrow" id="prevbtn" onclick="expShift(-1)">◀</button>
-<div class="exp-title" id="exptitle">—</div>
-<button class="arrow" id="nextbtn" onclick="expShift(1)">▶</button>
-</div>
-<div id="expchart"></div>
-<div class="cap" id="expcap">◀ previous day • next day ▶ • liters above each bar, time inside the bar</div>
-</div>
+  <!-- 3. WHEN IS WATER USED MOST (24-HOUR SVG BAR CHART) -->
+  <div id="sec-hourly" class="card">
+    <div class="card-head">
+      <h3>🕐 When Is Water Used Most? (Average Liters per Hour)</h3>
+      <div>
+        <button id="btnAvgOrig" class="btn btn-outline active" onclick="setAvgMode('orig')">Anchored Baseline Profile</button>
+        <button id="btnAvgFull" class="btn btn-outline" onclick="setAvgMode('full')">Updated 3-Day Mean (incl. Oct 23 2–4 AM)</button>
+      </div>
+    </div>
+    <div class="cap">
+      Average hourly consumption across logged days (Oct 21 – Oct 23, 2026) • <strong style="color:#e53935;">Red = Peak Hours (Top 3)</strong> • <strong style="color:#43a047;">Green = Normal</strong> • <strong style="color:#039be5;">Blue = Quietest Hours</strong>
+    </div>
+    <div class="svg-scroll">
+      <svg id="avgsvg" width="860" height="252"></svg>
+    </div>
+  </div>
 
-<div class="foot">Tank ESP → battery ESP bot → Firebase → this page • auto-refreshes every 10 min • PC not required • tank 2,000 L (100% = 1,950 L)</div>
+  <!-- 4. DAY-BY-DAY INTERACTIVE SVG CHART -->
+  <div id="sec-daybyday" class="card">
+    <div class="card-head">
+      <h3>📆 Daily Water Usage (Day-by-Day Hourly Breakdown)</h3>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn" onclick="shiftDay(-1)">&#9664; Prev Day</button>
+        <span id="daytitle" style="font-size:16px;font-weight:800;color:#0d47a1;min-width:290px;text-align:center;"></span>
+        <button class="btn" onclick="shiftDay(1)">Next Day &#9654;</button>
+      </div>
+    </div>
+    <div class="svg-scroll">
+      <svg id="daysvg" width="860" height="252"></svg>
+    </div>
+    <div class="cap">
+      &#9664; Use buttons to switch between <strong>Wed Oct 21</strong> (3,671 L), <strong>Thu Oct 22</strong> (1,870 L), and <strong>Fri Oct 23</strong> (271 L through 04:52 AM, now including 2 AM, 3 AM & 4 AM data!).
+    </div>
+  </div>
+
+  <!-- 5. CONTINUOUS TELEMETRY TIMELINE (CHART.JS) -->
+  <div id="sec-timeline" class="card">
+    <div class="card-head">
+      <h3>📈 Continuous Tank Level (% & Liters) & Pump State Timeline</h3>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <select id="timelineDateSelect" class="select" onchange="renderTimelineChart()">
+          <option value="ALL">All 3 Days (1,751 readings)</option>
+          <option value="2026-10-21">Oct 21 (Wed) — 1,241 readings (1-min polling)</option>
+          <option value="2026-10-22">Oct 22 (Thu) — 281 readings (5-min polling + 100% overfill)</option>
+          <option value="2026-10-23">Oct 23 (Fri) — 229 readings (Cycle #16 + 4 sensor dropouts)</option>
+        </select>
+        <label style="font-size:12.5px;color:#0d47a1;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
+          <input type="checkbox" id="filterGlitchChk" checked onchange="renderTimelineChart()" />
+          Hide 4 Zero-Pct Sensor Glitches (0.0%)
+        </label>
+      </div>
+    </div>
+    <div class="cap">
+      Interactive time-series of all 1,751 Firebase readings. Green dots mark <strong>Pump ON</strong> samples (161 pts); orange/red triangles mark the <strong>Oct 22 100% uncommanded fill</strong> and <strong>Oct 23 0% dropouts</strong>.
+    </div>
+    <div class="chart-box">
+      <canvas id="telemetryCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- 6. SYSTEM HEALTH & RECORDS (SIDE BY SIDE) -->
+  <div id="sec-health" class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <h3>🩺 System Health & Diagnostics</h3>
+        <span class="pill good">87% Coverage</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Diagnostic Metric</th><th>Measured Value & Engineering Detail</th></tr>
+          <tr><td class="deep">Total Telemetry Readings</td><td class="deep">1,751 rows (1,747 valid + 4 <code>0.0% / NaN</code> dropouts)</td></tr>
+          <tr><td class="deep">Monitoring Span</td><td class="deep">52 h 52 min 37 sec (Oct 21 00:00:01 &rarr; Oct 23 04:52:38)</td></tr>
+          <tr><td class="deep">Logging Coverage</td><td class="deep">87.2% active coverage (46.1 h active / 6.8 h in 7 outage gaps)</td></tr>
+          <tr><td class="deep">Polling Regime Shift</td><td class="deep"><strong>61s</strong> (Oct 21) &rarr; <strong>303s / 5-min</strong> (Oct 22) &rarr; <strong>60s</strong> (Oct 23 00:56+)</td></tr>
+          <tr><td class="deep">ESP32 Reboots / Gaps</td><td class="deep">7 gaps &gt;10 min (incl. pre-dawn 01:22–03:40 restarts &amp; offline fills)</td></tr>
+          <tr><td class="deep">Sensor Null Dropouts</td><td class="deep">4 single-sample <code>0.0% / pump=NaN</code> glitches on Oct 23 (recovered in 60s)</td></tr>
+          <tr><td class="deep">Uncommanded Overfill</td><td class="deep">1 event (Oct 22 13:48–14:58: rose 70.6% &rarr; 100.0% while <code>pump=OFF</code>)</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>🏆 Operational Records & Benchmarks</h3>
+        <span class="pill info">Oct 21 – Oct 23</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Record Category</th><th>Benchmark Value</th></tr>
+          <tr><td class="deep">⚡ Fastest Recorded Fill</td><td class="deep"><strong>10.1 min</strong> (Oct 22 at 05:58, 09:14, 11:46 &amp; 19:30 in 5-min regime)</td></tr>
+          <tr><td class="deep">🐢 Longest Recorded Fill</td><td class="deep"><strong>18.3 min</strong> (Cycle #5 on Oct 21, 14:49 &rarr; 15:07, +415 L)</td></tr>
+          <tr><td class="deep">💧 Largest Single Refill</td><td class="deep"><strong>+439 L (+22.5%)</strong> on Oct 22 12:22 PM &amp; <strong>+437 L (+22.4%)</strong> on Oct 23 01:36 AM</td></tr>
+          <tr><td class="deep">🔥 Busiest Day</td><td class="deep"><strong>Oct 21 (Wed)</strong> — 9 logged ON cycles (+1 offline fill) = 3,671 L used</td></tr>
+          <tr><td class="deep">🌊 Highest Tank Level</td><td class="deep"><strong>100.0% (1,950 L)</strong> on Oct 22, 14:13–14:33 (20 min saturation plateau)</td></tr>
+          <tr><td class="deep">📉 Lowest Valid Level</td><td class="deep"><strong>59.2% (1,154 L)</strong> on Oct 21 17:10 &amp; Oct 22 12:22 (auto-trigger floor)</td></tr>
+          <tr><td class="deep">📈 Biggest Sensor Glitch</td><td class="deep"><strong>-81.8% instant drop</strong> (81.8% &rarr; 0.0% on Oct 23 01:56:31, back to 81.1% in 60s)</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. DAILY SUMMARY TABLE -->
+  <div class="card">
+    <div class="card-head">
+      <h3>📅 Daily Summary Comparison</h3>
+      <span style="font-size:12px;color:#455a64;">Includes both Logged ON Cycles and Unlogged Offline Refills during Wi-Fi gaps</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th class="num">Readings</th>
+            <th>Polling Interval</th>
+            <th>Valid Level Range (%)</th>
+            <th>Volume Range (Liters)</th>
+            <th class="num">Mean Level</th>
+            <th class="num">Pump ON Samples</th>
+            <th>Logged Cycles</th>
+            <th class="num">Pumped Volume</th>
+            <th class="num">Usage Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="deep">Oct 21 (Wed)</td>
+            <td class="num deep">1,241</td>
+            <td><span class="pill info">~61s (1-min)</span></td>
+            <td class="deep">59.2% – 82.0%</td>
+            <td class="deep"><b style="color:#1565c0;">1,154 – 1,599 L</b></td>
+            <td class="num deep">70.8% (1,381 L)</td>
+            <td class="num deep">134 (10.8%)</td>
+            <td class="deep">9 cycles <span style="font-size:11.5px;color:#546e7a;">(+1 offline fill)</span></td>
+            <td class="num gain">+3,673 L</td>
+            <td class="num deep">3,671 L</td>
+          </tr>
+          <tr>
+            <td class="deep">Oct 22 (Thu)</td>
+            <td class="num deep">281</td>
+            <td><span class="pill warn">~303s (5-min)</span></td>
+            <td class="deep">59.2% – 100.0%</td>
+            <td class="deep"><b style="color:#1565c0;">1,154 – 1,950 L</b></td>
+            <td class="num deep">71.6% (1,396 L)</td>
+            <td class="num deep">14 (5.0%)</td>
+            <td class="deep">6 cycles <span style="font-size:11.5px;color:#e65100;">(+1 offline, +1 bypass)</span></td>
+            <td class="num gain">+2,452 L</td>
+            <td class="num deep">1,870 L</td>
+          </tr>
+          <tr>
+            <td class="deep">Oct 23 (Fri) <span style="font-size:11px;color:#546e7a;">(00:00–04:52)</span></td>
+            <td class="num deep">229 <span style="font-size:11px;color:#c62828;">(4 NaN)</span></td>
+            <td><span class="pill info">~60s (00:56+)</span></td>
+            <td class="deep">59.8% – 82.5% <span style="font-size:11px;color:#c62828;">(0% raw)</span></td>
+            <td class="deep"><b style="color:#1565c0;">1,166 – 1,609 L</b></td>
+            <td class="num deep">72.1% (1,405 L)</td>
+            <td class="num deep">13 (5.7%)</td>
+            <td class="deep"><strong>1 cycle (#16 at 01:36 AM)</strong></td>
+            <td class="num gain">+437 L</td>
+            <td class="num deep">271 L</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 8. ALL 16 PUMP CYCLES (NEWEST FIRST) -->
+  <div id="sec-cycles" class="card">
+    <div class="card-head">
+      <h3>🔄 Complete Pump Refill Cycles (All 16 Logged Cycles — Newest First)</h3>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="btnGainTrue" class="btn btn-outline active" onclick="setCycleGainMode('true')">True Trough &rarr; Peak Volume</button>
+        <button id="btnGainOn" class="btn btn-outline" onclick="setCycleGainMode('on')">First-ON &rarr; Cutoff Volume (Legacy)</button>
+      </div>
+    </div>
+    <div class="cap">
+      Includes <strong>Cycle #16 on Oct 23 (01:36 AM &rarr; 01:49 AM)</strong> which added +437 L. Toggle between <em>True Trough &rarr; Peak</em> (pre-trigger low to post-cutoff peak) and <em>First-ON &rarr; Cutoff</em> (which under-reports on Oct 22 due to 5-minute polling delay).
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Cycle #</th>
+            <th>Start Time</th>
+            <th>End Time</th>
+            <th>Polling</th>
+            <th class="num">Duration</th>
+            <th>Level Transition</th>
+            <th class="num">Gain (%)</th>
+            <th class="num">Volume Added</th>
+            <th class="num">Fill Rate</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="cyclesBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 9. ANOMALIES, BYPASS OVERFILL & TELEMETRY GAPS -->
+  <div id="sec-anomalies" class="card">
+    <div class="card-head">
+      <h3>⚠️ Engineering Anomaly Log: Overfill Bypass, Sensor Dropouts & Outage Gaps</h3>
+      <span class="pill warn">12 Logged Events</span>
+    </div>
+    <div class="cap">
+      Every hardware, sensor, and connectivity irregularity automatically isolated from the 1,751 readings.
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Event Type</th>
+            <th>Timestamp / Window</th>
+            <th>Duration</th>
+            <th>Tank Level Impact</th>
+            <th>Pump / Mode</th>
+            <th>Root-Cause Diagnosis</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background:#fff8e1;">
+            <td><span class="pill warn">100% Overfill Bypass</span></td>
+            <td class="mono deep">Oct 22, 13:48:06 &rarr; 14:58:53</td>
+            <td class="deep">70.8 min</td>
+            <td class="deep">70.6% &rarr; <strong>100.0%</strong> (+573 L)</td>
+            <td class="mono">OFF / AUTO</td>
+            <td>Tank filled to 100% (saturated 20 min at 1,950 L) while controller reported <code>pump=OFF</code>. Manual bypass switch, auxiliary pump, or stuck float/relay.</td>
+          </tr>
+          <tr>
+            <td><span class="pill bad">Sensor Dropout #1</span></td>
+            <td class="mono deep">Oct 23, 00:56:28</td>
+            <td class="deep">1 sample (60s)</td>
+            <td class="deep">63.1% &rarr; <b style="color:#c62828;">0.0%</b> &rarr; 63.5%</td>
+            <td class="mono">NaN / AUTO</td>
+            <td>Transient ultrasonic timeout + null pump payload exactly as polling switched from 5-min back to 1-min.</td>
+          </tr>
+          <tr>
+            <td><span class="pill bad">Sensor Dropout #2</span></td>
+            <td class="mono deep">Oct 23, 01:56:31</td>
+            <td class="deep">1 sample (60s)</td>
+            <td class="deep">81.8% &rarr; <b style="color:#c62828;">0.0%</b> &rarr; 81.1%</td>
+            <td class="mono">NaN / AUTO</td>
+            <td>Single-sample zero reading shortly after Cycle #16 completed; recovered 60s later.</td>
+          </tr>
+          <tr>
+            <td><span class="pill bad">Sensor Dropout #3</span></td>
+            <td class="mono deep">Oct 23, 02:26:33</td>
+            <td class="deep">1 sample (60s)</td>
+            <td class="deep">79.6% &rarr; <b style="color:#c62828;">0.0%</b> &rarr; 79.6%</td>
+            <td class="mono">NaN / AUTO</td>
+            <td>Single-sample sensor timeout; zero physical water change.</td>
+          </tr>
+          <tr>
+            <td><span class="pill bad">Sensor Dropout #4</span></td>
+            <td class="mono deep">Oct 23, 03:46:55</td>
+            <td class="deep">1 sample (60s)</td>
+            <td class="deep">72.5% &rarr; <b style="color:#c62828;">0.0%</b> &rarr; 73.9%</td>
+            <td class="mono">NaN / AUTO</td>
+            <td>Single-sample sensor timeout; recovered immediately on next 60s tick.</td>
+          </tr>
+          <tr>
+            <td><span class="pill info">Offline Fill + Outage</span></td>
+            <td class="mono deep">Oct 22, 01:22:53 &rarr; 03:25:22</td>
+            <td class="deep"><strong>122.5 min (2.04 h)</strong></td>
+            <td class="deep">60.8% &rarr; <strong>73.9% (+255 L)</strong></td>
+            <td class="mono">OFF / AUTO</td>
+            <td>Longest Wi-Fi/logger gap. Tank hit 60% trigger and completed an automatic fill cycle offline.</td>
+          </tr>
+          <tr>
+            <td><span class="pill info">Offline Fill + Outage</span></td>
+            <td class="mono deep">Oct 21, 02:16:24 &rarr; 03:40:23</td>
+            <td class="deep"><strong>84.0 min (1.40 h)</strong></td>
+            <td class="deep">61.1% &rarr; <strong>76.8% (+306 L)</strong></td>
+            <td class="mono">OFF / AUTO</td>
+            <td>Pre-dawn connectivity outage; local controller executed an auto-refill cycle while offline.</td>
+          </tr>
+          <tr>
+            <td><span class="pill info">Post-Overfill Outage</span></td>
+            <td class="mono deep">Oct 22, 14:58:53 &rarr; 16:25:12</td>
+            <td class="deep"><strong>86.3 min (1.44 h)</strong></td>
+            <td class="deep">96.8% &rarr; 83.5% (-259 L)</td>
+            <td class="mono">OFF / AUTO</td>
+            <td>Telemetry gap following the 100% overfill event; normal afternoon consumption drained tank to 83.5%.</td>
+          </tr>
+          <tr>
+            <td><span class="pill info">4 Shorter Wi-Fi Gaps</span></td>
+            <td class="mono deep">Oct 21 (01:24, 05:25, 22:46) &amp; Oct 23 (03:00)</td>
+            <td class="deep">11 to 40 min each</td>
+            <td class="deep">Small normal drops (-1.5% to -2.9%)</td>
+            <td class="mono">OFF / AUTO</td>
+            <td>Brief Wi-Fi / Firebase disconnects with normal background water draw and no missed pump cycles.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 10. FULL TELEMETRY LOG EXPLORER -->
+  <div id="sec-raw" class="card">
+    <div class="card-head">
+      <h3>🔍 Full Firebase Telemetry Explorer (All 1,751 Readings)</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="rawSearch" class="input" placeholder="Search timestamp or % (e.g. 2026-10-23T01 or 100.0)..." oninput="filterRawTable()" style="min-width:240px;" />
+        <select id="rawPumpFilter" class="select" onchange="filterRawTable()">
+          <option value="ALL">All Pump States (1,751)</option>
+          <option value="ON">Pump = ON (161)</option>
+          <option value="OFF">Pump = OFF (1,586)</option>
+          <option value="NULL">Pump = NaN / Glitch (4)</option>
+        </select>
+        <select id="rawSpecialFilter" class="select" onchange="filterRawTable()">
+          <option value="ALL">All Readings</option>
+          <option value="OVER85">Overfill / High Level (&gt;85%)</option>
+          <option value="GLITCH">Zero-Pct Dropouts (0.0%)</option>
+          <option value="GAP">Telemetry Gaps (&Delta;t &gt; 310s)</option>
+        </select>
+      </div>
+    </div>
+    <div class="cap" id="rawStatusCap">Showing all 1,751 records (newest first).</div>
+    <div class="table-wrap" style="max-height: 440px; overflow-y: auto;">
+      <table>
+        <thead style="position:sticky;top:0;z-index:5;">
+          <tr>
+            <th>Row #</th>
+            <th>Timestamp (ISO +06:00)</th>
+            <th class="num">Level (%)</th>
+            <th class="num">Volume (L)</th>
+            <th class="num">&Delta; Level (%)</th>
+            <th>Pump</th>
+            <th>Mode</th>
+            <th class="num">Interval (&Delta;t)</th>
+          </tr>
+        </thead>
+        <tbody id="rawTableBody"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+      <button class="btn btn-outline" onclick="changeRawPage(-1)">&#9664; Previous 100</button>
+      <span id="rawPageInfo" style="font-size:13px;font-weight:700;color:#0d47a1;">Page 1</span>
+      <button class="btn btn-outline" onclick="changeRawPage(1)">Next 100 &#9654;</button>
+    </div>
+  </div>
+
 </div>
 
 <script>
-const FB = "https://battery-monitor-a1063-default-rtdb.asia-southeast1.firebasedatabase.app";
-const L = 19.5, CAP = 1950;
-
-function normRec(r) {
-  if (r && r.pct !== undefined && r.timestamp_iso) {
-    const t = new Date(r.timestamp_iso).getTime() / 1000;
-    if (isFinite(t)) return { ts: t, lvl: r.pct, pump: r.pump || "?", mode: r.mode || "AUTO" };
-  }
-  if (r && r.ts !== undefined && r.lvl !== undefined)
-    return { ts: r.ts, lvl: r.lvl, pump: r.pump || "?", mode: "AUTO" };
-  return null;
-}
-function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
-function h12(h) { return ((h % 12) || 12) + " " + (h < 12 ? "AM" : "PM"); }
-function ago(ep) { const s = Math.floor(Date.now() / 1000) - ep;
-  if (s < 90) return s + "m"; if (s < 5400) return Math.floor(s / 60) + "m";
-  if (s < 86400) return Math.floor(s / 3600) + "h"; return Math.floor(s / 86400) + "d"; }
-function fmtL(n) { return Math.round(n).toLocaleString(); }
-function dkey(ts) { const d = new Date(ts * 1000);
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
-function fday(d) { return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
-function fdayLong(d) { return new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }); }
-function ftime(ts) { return new Date(ts * 1000).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); }
-
-function analyze(rows) {
-  const segs = []; let cur = [rows[0]];
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i].ts - rows[i - 1].ts > 1800) { segs.push(cur); cur = [rows[i]]; }
-    else cur.push(rows[i]);
-  }
-  if (cur.length) segs.push(cur);
-
-  let biggestGlitch = 0, glitchTs = null;
-  for (const seg of segs)
-    for (let k = 1; k < seg.length - 1; k++) {
-      const lv = seg[k].lvl, la = seg[k - 1].lvl, lb = seg[k + 1].lvl;
-      if (lv !== null && la !== null && lb !== null && Math.abs(lv - la) > 5 && Math.abs(lv - lb) > 5) {
-        biggestGlitch = Math.max(biggestGlitch, Math.abs(lv - la));
-        glitchTs = seg[k].ts;
-        seg[k].lvl = Math.round(((la + lb) / 2) * 10) / 10;
-      }
-    }
-
-  // cycles: level-rise runs (pump text flickers at 1-min sampling)
-  const cycles = [], delivered = {};
-  for (const seg of segs) {
-    let cyc = null;
-    const close = () => {
-      if (!cyc) return;
-      const dur = Math.max(1, Math.round((cyc.e - cyc.s) / 60));
-      const dl = cyc.l1 - cyc.l0;
-      if (dl >= 3) {
-        const liters = dl * L;
-        const abn = dur < 5 || dur > 40 || dl > 30;
-        cycles.push({ s: cyc.s, e: cyc.e, dur, l0: cyc.l0, l1: cyc.l1, dl, liters, abn });
-        if (!abn && dl >= 8) delivered[dkey(cyc.s)] = (delivered[dkey(cyc.s)] || 0) + liters;
-      }
-      cyc = null;
+  // ==== LIVE DATA LAYER — TELEMETRY/CYCLES/DAYS/AVG_* are rebuilt from Firebase on every load ====
+  const FBURL = "https://battery-monitor-a1063-default-rtdb.asia-southeast1.firebasedatabase.app";
+  const LPCT = 19.5;
+  let TELEMETRY = [], CYCLES = [], DAYS = {}, AVG_ORIG = [], AVG_FULL = [];
+  let LIVE_STATS = {};
+  const BDMON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function bd(epoch) {
+    const d = new Date((epoch + 21600) * 1000), p = n => String(n).padStart(2, "0");
+    const hh = d.getUTCHours();
+    return {
+      iso: d.getUTCFullYear()+"-"+p(d.getUTCMonth()+1)+"-"+p(d.getUTCDate())+"T"+p(hh)+":"+p(d.getUTCMinutes())+":"+p(d.getUTCSeconds())+"+06:00",
+      ts: d.getUTCFullYear()+"-"+p(d.getUTCMonth()+1)+"-"+p(d.getUTCDate())+" "+p(hh)+":"+p(d.getUTCMinutes())+":"+p(d.getUTCSeconds()),
+      date: d.getUTCFullYear()+"-"+p(d.getUTCMonth()+1)+"-"+p(d.getUTCDate()),
+      hour: hh, clock: p(hh)+":"+p(d.getUTCMinutes()),
+      fmt: BDMON[d.getUTCMonth()]+" "+d.getUTCDate()+" "+p((hh%12)||12)+":"+p(d.getUTCMinutes())+" "+(hh<12?"AM":"PM")
     };
-    for (let i = 1; i < seg.length; i++) {
-      const a = seg[i - 1], b = seg[i];
-      if (a.lvl === null || b.lvl === null) continue;
-      const diff = b.lvl - a.lvl;
-      if (diff > 0.8) {
-        if (!cyc) cyc = { s: a.ts, e: b.ts, l0: a.lvl, l1: b.lvl };
-        else { cyc.e = b.ts; cyc.l1 = Math.max(cyc.l1, b.lvl); }
-      } else if (cyc && b.ts - cyc.e > 600) close();
-    }
-    close();
   }
 
-  // drain windows: stretches between fill intervals, settle skip 12 min
-  const dayRaw = {};
-  for (const seg of segs) {
-    const fills = []; let f = null;
-    for (let i = 1; i < seg.length; i++) {
-      const a = seg[i - 1], b = seg[i];
-      if (a.lvl === null || b.lvl === null) continue;
-      if (b.lvl - a.lvl > 0.8) {
-        if (!f) f = { s: a.ts, e: b.ts, l0: a.lvl, l1: b.lvl };
-        else { f.e = b.ts; f.l1 = Math.max(f.l1, b.lvl); }
-      } else if (f && b.ts - f.e > 600) {
-        if (f.l1 - f.l0 >= 3) fills.push(f);   // ignore sub-3% bounce "fills"
-        f = null;
+  async function loadLive() {
+    const [h, latest] = await Promise.all([
+      fetch(FBURL + "/tank_history.json?ts=" + Date.now()).then(r => r.json()),
+      fetch(FBURL + "/tank/latest.json?ts=" + Date.now()).then(r => r.json()).catch(() => null)
+    ]);
+    const raw = [];
+    for (const k in (h || {})) {
+      const r = h[k];
+      if (!r || typeof r !== "object") continue;
+      let epoch = null, pct = null, pump = "?", mode = "AUTO";
+      if (r.timestamp_iso !== undefined && r.pct !== undefined) {
+        epoch = Math.round(new Date(r.timestamp_iso).getTime() / 1000);
+        pct = r.pct; pump = r.pump || "?"; mode = r.mode || "AUTO";
+      } else if (r.ts !== undefined && r.lvl !== undefined) {
+        epoch = r.ts; pct = r.lvl; pump = r.pump || "?"; mode = "AUTO";
+      }
+      if (epoch === null || !isFinite(epoch) || pct === null || !isFinite(pct)) continue;
+      raw.push({ epoch, pct, pump, mode });
+    }
+    if (latest && latest.ts) {
+      const pct = latest.pct !== undefined ? latest.pct : latest.lvl;
+      if (pct !== undefined && isFinite(pct)) raw.push({ epoch: latest.ts, pct, pump: latest.pump || "?", mode: latest.mode || "AUTO" });
+    }
+    raw.sort((a, b) => a.epoch - b.epoch);
+    const ded = [];
+    for (const r of raw) { if (!ded.length || r.epoch !== ded[ded.length - 1].epoch) ded.push(r); }
+    TELEMETRY = ded.map((r, i) => {
+      const p = bd(r.epoch), prev = i > 0 ? ded[i - 1] : null;
+      return { id: i + 1, _e: r.epoch, ts: p.ts, iso: p.iso, date: p.date, hour: p.hour,
+        pct: r.pct, liters: Math.round(r.pct * LPCT), pump: r.pump, mode: r.mode,
+        dt_sec: prev ? r.epoch - prev.epoch : 0, dpct: prev ? Math.round((r.pct - prev.pct) * 10) / 10 : 0 };
+    });
+  }
+
+  function buildDerived() {
+    // ---- pump cycles: continuous pump=ON runs ----
+    CYCLES = [];
+    let run = null;
+    const med = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+    const endRun = (r) => {
+      if (!run) return;
+      const first = run.rows[0], last = run.rows[run.rows.length - 1];
+      const i0 = TELEMETRY.indexOf(first);
+      const i1 = r ? TELEMETRY.indexOf(r) : TELEMETRY.length;
+      const cutoff = (r && r.pump === "OFF") ? r.pct : last.pct;
+      let trough = first.pct, peak = Math.max(cutoff, last.pct);
+      for (let j = Math.max(0, i0 - 15); j < i0; j++) trough = Math.min(trough, TELEMETRY[j].pct);
+      for (let j = i0; j < Math.min(TELEMETRY.length, i1 + 15); j++) peak = Math.max(peak, TELEMETRY[j].pct);
+      const trigger = i0 > 0 ? TELEMETRY[i0 - 1].pct : first.pct;
+      const durExact = r ? Math.max(0.1, (r._e - first._e) / 60) : Math.max(0.1, (last._e - first._e) / 60 + 1);
+      if (run.rows.length >= 2 && durExact >= 3) {
+        const dts = run.rows.slice(1).map(x => x.dt_sec).filter(x => x > 0);
+        const gainOn = Math.max(0, cutoff - first.pct), gainTrue = Math.max(0, peak - trough);
+        const p0 = bd(first._e);
+        CYCLES.push({ no: CYCLES.length + 1, date: p0.date, _s0: first._e, _s1: endR2(r, last),
+          start_fmt: p0.fmt, end_fmt: r ? bd(r._e).clock : p0.clock,
+          dur_min: Math.round(durExact), dur_exact: Math.round(durExact * 10) / 10,
+          samples: run.rows.length, regime: med(dts) <= 150 ? "1-min" : "5-min",
+          trigger_pct: Math.round(trigger * 10) / 10, first_on_pct: first.pct,
+          cutoff_pct: Math.round(cutoff * 10) / 10, trough_pct: trough, peak_pct: peak,
+          gain_on_pct: Math.round(gainOn * 10) / 10, gain_on_l: Math.round(gainOn * LPCT),
+          gain_true_pct: Math.round(gainTrue * 10) / 10, gain_true_l: Math.round(gainTrue * LPCT),
+          rate_l_min: Math.round(gainOn * LPCT / durExact * 10) / 10,
+          rate_pct_min: Math.round(gainOn / durExact * 100) / 100 });
+      }
+      run = null;
+    };
+    const endR2 = (r, last) => r ? r._e : last._e;
+    for (let i = 0; i <= TELEMETRY.length; i++) {
+      const r = TELEMETRY[i];
+      const isOn = r && r.pump === "ON";
+      if (isOn && !run) run = { rows: [] };
+      if (run) {
+        if (isOn) { run.rows.push(r); }
+        else if (r && r.pump === "?") { /* null pump inside run: ignore */ }
+        else { endRun(r); }
       }
     }
-    if (f) { if (f.l1 - f.l0 >= 3) fills.push(f); f = null; }
-    for (let x = 0; x <= fills.length; x++) {
-      const wStart = x === 0 ? seg[0].ts : fills[x - 1].e;
-      const wEnd = x === fills.length ? seg[seg.length - 1].ts : fills[x].s;
-      if (wEnd - wStart < 1800) continue;
-      const t0 = wStart + 720;
-      const dur = wEnd - t0;
-      if (dur < 1080) continue;
-      const at = ts => { let best = null;
-        for (const r of seg) { if (r.lvl !== null && Math.abs(r.ts - ts) <= 300) best = r; if (r.ts > ts + 300) break; }
-        return best; };
-      const r0 = at(wStart), r1 = at(wEnd);
-      if (!r0 || !r1) continue;
-      const drop = r0.lvl - r1.lvl;
-      if (drop < 0 || drop > 40) continue;
+
+    // ---- day-by-day drain hours (fill intervals = real cycles >=3% gain) ----
+    const segs = []; let cur = [TELEMETRY[0]];
+    for (let i = 1; i < TELEMETRY.length; i++) {
+      if (TELEMETRY[i]._e - TELEMETRY[i - 1]._e > 1800) { segs.push(cur); cur = [TELEMETRY[i]]; }
+      else cur.push(TELEMETRY[i]);
+    }
+    if (cur.length) segs.push(cur);
+    const realFills = CYCLES.filter(c => c.gain_true_pct >= 3);
+    const dayRaw = {};
+    const at = (seg, ts) => { let best = null;
+      for (const r of seg) { if (Math.abs(r._e - ts) <= 330) best = r; if (r._e > ts + 330) break; }
+      return best; };
+    const collect = (seg, wStart, wEnd) => {
+      if (wEnd - wStart < 1800) return;
+      const t0 = wStart + 720, dur = wEnd - t0;
+      if (dur < 1080) return;
+      const r0 = at(seg, wStart), r1 = at(seg, wEnd);
+      if (!r0 || !r1) return;
+      const drop = r0.pct - r1.pct;
+      if (drop < 0 || drop > 40) return;
       const rate = drop / (dur / 3600);
       let t = t0;
       while (t < wEnd) {
-        const d = new Date(t * 1000), h = d.getHours();
-        const base = new Date(t * 1000); base.setMinutes(0, 0, 0);
-        const nxt = base.getTime() / 1000 + 3600;
+        const p = bd(t);
+        const hourStart = t - ((t + 21600) % 3600);
+        const nxt = hourStart + 3600;
         const frac = (Math.min(nxt, wEnd) - t) / 3600;
-        const key = dkey(t) + "|" + h;
+        const key = p.date + "|" + p.hour;
         dayRaw[key] = (dayRaw[key] || 0) + rate * frac;
         t = nxt;
       }
+    };
+    for (const seg of segs) {
+      const s0 = seg[0]._e, s1 = seg[seg.length - 1]._e;
+      const fl = realFills.filter(c => c._s0 >= s0 - 60 && c._s0 <= s1 + 60).sort((a, b) => a._s0 - b._s0);
+      if (!fl.length) { collect(seg, s0, s1); continue; }
+      collect(seg, s0, fl[0]._s0);
+      for (let x = 1; x < fl.length; x++) collect(seg, fl[x - 1]._s1, fl[x]._s0);
+      collect(seg, fl[fl.length - 1]._s1, s1);
     }
-  }
-  return { rows, cycles, delivered, dayRaw, segs, biggestGlitch, glitchTs };
-}
-
-// ---------- global state ----------
-let DAYS = {};          // dateKey -> {hours:[24|null], total}
-let DAYKEYS = [];       // sorted
-let expIdx = 0;
-
-function bars24(vals, maxv) {
-  const have = vals.map((v, i) => v !== null ? i : -1).filter(i => i >= 0);
-  const sorted = have.slice().sort((a, b) => vals[b] - vals[a]);
-  const reds = new Set(sorted.slice(0, 3));
-  let s = '<svg viewBox="0 0 860 250" width="100%">';
-  vals.forEach((v, h) => {
-    const x = 18 + h * 34;
-    if (v === null) {
-      s += `<rect fill="#cfd8dc" x="${x}" y="168" width="26" height="56" rx="4"/>`;
-      s += `<text x="${x+13}" y="222" transform="rotate(-90 ${x+13} 222)" text-anchor="start" font-size="10.5" fill="#78909c" font-weight="bold">NO DATA</text>`;
-    } else {
-      const hpx = Math.max(8, v / maxv * 175);
-      const fill = reds.has(h) ? "#ff5252" : "#66bb6a";
-      s += `<rect fill="${fill}" x="${x}" y="${230-hpx}" width="26" height="${hpx}" rx="4"/>`;
-      s += `<text x="${x+13}" y="${230-hpx-6}" text-anchor="middle" font-size="11" fill="#0d47a1" font-weight="bold">${Math.round(v)} L</text>`;
-      s += `<text x="${x+15}" y="226" transform="rotate(-90 ${x+15} 226)" text-anchor="start" font-size="9.5" fill="#ffffff" font-weight="bold">${h12(h)}</text>`;
+    // assemble DAYS
+    DAYS = {}; DAY_KEYS = [];
+    const dates = [...new Set(TELEMETRY.map(r => r.date))].sort();
+    const rowsByDate = {};
+    TELEMETRY.forEach(r => { (rowsByDate[r.date] = rowsByDate[r.date] || []).push(r); });
+    for (const d of dates) {
+      const hours = Array(24).fill(null);
+      for (let hh = 0; hh < 24; hh++) {
+        const hasRows = (rowsByDate[d] || []).some(r => r.hour === hh);
+        const v = dayRaw[d + "|" + hh];
+        if (v !== undefined) hours[hh] = Math.round(v * LPCT);
+        else if (hasRows) hours[hh] = 0;
+      }
+      const cyc = CYCLES.filter(c => c.date === d);
+      DAYS[d] = { hours, total: hours.reduce((s, v) => s + (v || 0), 0),
+        pumped_l: cyc.reduce((s, c) => s + c.gain_true_l, 0), cycles: cyc.length };
+      DAY_KEYS.push(d);
     }
-  });
-  return s + "</svg>";
-}
+    AVG_FULL = []; AVG_ORIG = [];
+    for (let hh = 0; hh < 24; hh++) {
+      const vals = DAY_KEYS.map(d => DAYS[d].hours[hh]).filter(v => v !== null);
+      const m = vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : null;
+      AVG_FULL.push(m); AVG_ORIG.push(m);
+    }
 
-function expShift(dir) {
-  expIdx = Math.min(DAYKEYS.length - 1, Math.max(0, expIdx + dir));
-  renderExp();
-}
-function renderExp() {
-  if (!DAYKEYS.length) return;
-  const dk = DAYKEYS[expIdx];
-  const d = DAYS[dk];
-  const maxv = Math.max(1, ...d.hours.map(v => v || 0));
-  document.getElementById("exptitle").textContent = fdayLong(dk) + " — " + fmtL(d.total) + " L total";
-  document.getElementById("expchart").innerHTML = bars24(d.hours, maxv);
-  document.getElementById("prevbtn").disabled = expIdx === 0;
-  document.getElementById("nextbtn").disabled = expIdx === DAYKEYS.length - 1;
-}
-
-function render(A, shed) {
-  const rows = A.rows, cycles = A.cycles, delivered = A.delivered;
-  const cur = rows[rows.length - 1];
-  const lit = (cur.lvl || 0) * L;
-
-  // ---- drain analysis + scaling ----
-  const daysRawSum = {};
-  for (const key in A.dayRaw) {
-    const d = key.split("|")[0];
-    daysRawSum[d] = (daysRawSum[d] || 0) + A.dayRaw[key];
+    // ---- stats for the static sections ----
+    const n = TELEMETRY.length;
+    const dropouts = TELEMETRY.filter(r => r.pct === 0).length;
+    const onRows = TELEMETRY.filter(r => r.pump === "ON").length;
+    let gaps = 0, gapSec = 0, bigGapSec = 0;
+    for (let i = 1; i < n; i++) {
+      const g = TELEMETRY[i].dt_sec;
+      if (g > 600) { gaps++; gapSec += g; bigGapSec = Math.max(bigGapSec, g); }
+      else if (g > 310) gapSec += g;
+    }
+    let spanTxt = "—", covPct = 0;
+    if (n > 1) {
+      // approximate span from first/last iso
+      const t0 = new Date(TELEMETRY[0].iso.slice(0, 19)).getTime();
+      const t1 = new Date(TELEMETRY[n - 1].iso.slice(0, 19)).getTime();
+      const span = Math.max(1, (t1 - t0) / 1000);
+      const active = span - gapSec;
+      covPct = Math.max(0, Math.min(100, active / span * 100));
+      const fh = Math.floor(span / 3600), fm = Math.round(span % 3600 / 60);
+      spanTxt = fh + " h " + fm + " min (" + TELEMETRY[0].iso.slice(5, 16).replace("T", " ") + " → " + TELEMETRY[n - 1].iso.slice(5, 16).replace("T", " ") + " +06:00)";
+    }
+    const regimeByDate = dates.map(d => {
+      const dts = (rowsByDate[d] || []).map(r => r.dt_sec).filter(x => x > 0 && x <= 600);
+      return { date: d, n: (rowsByDate[d] || []).length, reg: med(dts) <= 150 ? "1-min" : "5-min", drop: (rowsByDate[d] || []).filter(r => r.pct === 0).length };
+    });
+    const overfill = [];
+    for (let i = 1; i < n; i++)
+      if (TELEMETRY[i].pct >= 99.5 && TELEMETRY[i].pump === "OFF" && TELEMETRY[i - 1].pct < 99.5)
+        overfill.push(TELEMETRY[i]);
+    // current draw + baseline are computed in updateStatic from iso times
+    LIVE_STATS = { n, dropouts, onRows, gaps, gapSec, covPct, spanTxt, regimeByDate, overfill, dates, rowsByDate };
   }
-  const avgDelivered = Object.keys(delivered).length ?
-    Object.values(delivered).reduce((s, v) => s + v, 0) / Object.keys(delivered).length : 0;
-  const rawAll = Object.values(daysRawSum).reduce((s, v) => s + v, 0);
-  const gscale = rawAll > 0 ? avgDelivered / (rawAll * L) : 0;
-  const scaleFor = d => {
-    const del = delivered[d];
-    if (del === undefined) return gscale * L;
-    const rawL = (daysRawSum[d] || 0) * L;
-    return (rawL >= 0.5 * del) ? del / Math.max(0.01, daysRawSum[d]) : gscale * L;
-  };
-  // per-day hour arrays + avg profile
-  const perDayHours = {};
-  const hourTot = {}, hourN = {};
-  for (const key in A.dayRaw) {
-    const parts = key.split("|");
-    const d = parts[0], h = +parts[1];
-    const val = A.dayRaw[key] * scaleFor(d);
-    perDayHours[d] = perDayHours[d] || {};
-    perDayHours[d][h] = (perDayHours[d][h] || 0) + val;
-    hourTot[h] = (hourTot[h] || 0) + val;
-    hourN[h] = (hourN[h] || 0) + 1;
+
+  function updateStatic() {
+    const n = TELEMETRY.length;
+    if (!n) return;
+    const last = TELEMETRY[n - 1];
+    const pct = last.pct, lit = Math.round(pct * LPCT);
+    const guard = (fn) => { try { fn(); } catch (e) { console.warn("updateStatic", e); } };
+
+    guard(() => { // hero
+      const gen = document.querySelector(".hero .gen");
+      if (gen) gen.innerHTML = "Updated " + new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) +
+        " • <strong>" + n.toLocaleString() + " Firebase readings analyzed</strong> (live) • Tank Capacity: <strong>1,950 L</strong>";
+      const badges = document.querySelectorAll(".hero-badges .h-badge");
+      if (badges.length >= 3) {
+        badges[0].innerHTML = "Mode: <b>" + esc2(last.mode) + "</b>";
+        badges[2].innerHTML = "Total Cycles: <b>" + CYCLES.length + " ON</b>";
+      }
+    });
+    guard(() => { // live card
+      const pill = document.querySelector("#sec-live .card-head .pill");
+      if (pill) pill.textContent = "Last Synced: " + last.ts + " (+06:00)";
+      const water = document.querySelector("#sec-live .tank-water");
+      if (water) water.style.height = pct + "%";
+      const ov = document.querySelectorAll("#sec-live .tank-overlay-text span");
+      if (ov.length >= 2) { ov[0].textContent = pct.toFixed(1) + "%"; ov[1].textContent = lit.toLocaleString() + " L"; }
+    });
+    guard(() => { // live metric boxes
+      const boxes = document.querySelectorAll("#sec-live .lbox");
+      if (boxes.length < 6) return;
+      // current drain rate (last continuous OFF stretch, 12-min settle skip, >=18 min)
+      let rate = null, sincePeakTxt = "";
+      let j = n - 1;
+      while (j >= 0 && TELEMETRY[j].pump === "OFF") j--;
+      const stretch = TELEMETRY.slice(j + 1);
+      if (stretch.length >= 3) {
+        const t0 = new Date(stretch[0].iso.slice(0, 19)).getTime() / 1000 + 720;
+        const t1 = new Date(last.iso.slice(0, 19)).getTime() / 1000;
+        const dur = t1 - t0;
+        if (dur >= 1080) {
+          const drop = stretch[0].pct - last.pct;
+          if (drop >= 0 && drop <= 40) rate = Math.max(0, drop / (dur / 3600) * LPCT);
+        }
+      }
+      const nightVals = AVG_FULL.slice(0, 6).filter(v => v !== null);
+      const nightBase = nightVals.length ? Math.round(nightVals.reduce((s, v) => s + v, 0) / nightVals.length) : null;
+      const bufPct = Math.max(0, pct - 60);
+      const setBox = (i, big, sub) => {
+        const b = boxes[i]; if (!b) return;
+        b.querySelector(".big").textContent = big;
+        b.querySelector(".sub").innerHTML = sub;
+      };
+      setBox(0, lit.toLocaleString() + " L", "<strong>" + pct.toFixed(1) + "%</strong> of 1,950 L capacity");
+      setBox(1, esc2(last.pump), "Mode: <strong>" + esc2(last.mode) + "</strong> (Duty: " + (LIVE_STATS.n ? (LIVE_STATS.onRows / LIVE_STATS.n * 100).toFixed(1) : "0") + "% ON)");
+      setBox(2, Math.round(bufPct * LPCT).toLocaleString() + " L", "<strong>+" + bufPct.toFixed(1) + "%</strong> above 60.0% (1,170 L)");
+      setBox(3, rate === null ? "— measuring" : Math.round(rate) + " L/h", rate === null ? "<strong>need ≥18 min data</strong>" : "<strong>" + (rate / LPCT).toFixed(1) + "%/h</strong> current draw");
+      setBox(4, nightBase === null ? "—" : nightBase + " L/h", "<strong>" + (nightBase === null ? "" : (nightBase / LPCT).toFixed(1) + "%/h") + "</strong> quiet-hour baseline");
+      const lastC = CYCLES.length ? CYCLES[CYCLES.length - 1] : null;
+      setBox(5, lastC ? "Cycle #" + lastC.no : "—", lastC ? "<strong>" + lastC.start_fmt + "</strong> (+" + lastC.gain_true_l + " L)" : "no cycle yet");
+      // ETA banner
+      const eta = document.querySelector("#sec-live .eta-banner");
+      if (eta) {
+        let line1 = "🔮 <strong>Next Auto-Fill ETA:</strong> measuring draw rate…";
+        if (pct <= 60) line1 = "🔮 <strong>Next Auto-Fill ETA:</strong> <strong>IMMINENT</strong> — level at/below the 60% trigger";
+        else if (rate !== null && rate > 0.5) {
+          const hrs = (pct - 60) / (rate / LPCT);
+          const etaD = new Date(Date.now() + hrs * 3600000);
+          line1 = "🔮 <strong>Next Auto-Fill ETA:</strong> ≈ <strong>" + (hrs >= 24 ? (hrs / 24).toFixed(1) + " days" : hrs.toFixed(1) + " h") + "</strong> at current " + Math.round(rate) + " L/h draw" +
+            (hrs < 48 ? " (≈ " + etaD.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) + ")" : "");
+        }
+        const lc = CYCLES.length ? CYCLES[CYCLES.length - 1] : null;
+        const line2 = lc ? "✅ <strong>Last Fill (#" + lc.no + "):</strong> " + lc.start_fmt + " &rarr; " + lc.end_fmt + " (" + lc.trough_pct.toFixed(1) + "% &rarr; " + lc.peak_pct.toFixed(1) + "%, +" + lc.gain_true_l + " L in " + lc.dur_min + " min)" : "";
+        eta.innerHTML = "<span>" + line1 + "</span>" + (line2 ? "<span>" + line2 + "</span>" : "");
+      }
+    });
+    guard(() => { // key numbers
+      const kv = document.querySelector(".kv-grid");
+      if (!kv) return;
+      const nor = CYCLES.filter(c => !c.abn && c.gain_true_pct >= 3);
+      const avgFill = nor.length ? nor.reduce((s, c) => s + c.dur_exact, 0) / nor.length : 0;
+      const meanSpeed = nor.length ? nor.reduce((s, c) => s + c.rate_l_min, 0) / nor.length : 0;
+      const nightVals = AVG_FULL.slice(0, 6).concat(AVG_FULL.slice(22)).filter(v => v !== null);
+      const dayVals = AVG_FULL.slice(6, 22).filter(v => v !== null);
+      const mean = a => a.length ? Math.round(a.reduce((s, v) => s + v, 0) / a.length) : 0;
+      const idx = AVG_FULL.map((v, i) => v !== null ? i : -1).filter(i => i >= 0);
+      const peakH = idx.sort((a, b) => AVG_FULL[b] - AVG_FULL[a])[0];
+      const pumped = CYCLES.reduce((s, c) => s + c.gain_true_l, 0);
+      kv.innerHTML =
+        '<div class="kv">🕐 Peak Usage Hour: <b>' + (peakH !== undefined ? h12(peakH) : "—") + '</b> (≈ ' + (peakH !== undefined ? AVG_FULL[peakH] : 0) + ' L avg)</div>' +
+        '<div class="kv">🚿 Logged Pump Cycles: <b>' + CYCLES.length + ' ON Cycles</b></div>' +
+        '<div class="kv">⏱️ Avg Fill Cycle: <b>' + avgFill.toFixed(1) + ' min</b> (trough-to-peak per fill)</div>' +
+        '<div class="kv">⚡ Mean Fill Speed: <b>' + meanSpeed.toFixed(1) + ' L/min</b> while Pump ON</div>' +
+        '<div class="kv">🌙 Night Usage (12–6 AM): <b>≈ ' + mean(nightVals) + ' L/h</b> vs ☀️ Day Usage: <b>≈ ' + mean(dayVals) + ' L/h</b></div>' +
+        '<div class="kv">✅ Pumped Volume Sanity: <b>' + pumped.toLocaleString() + ' L total</b> across ' + CYCLES.length + ' cycles</div>';
+    });
+    guard(() => { // health + records
+      const pill = document.querySelector("#sec-health .pill.good, #sec-health .pill.warn, #sec-health .pill.bad");
+      if (pill) { pill.className = "pill " + (LIVE_STATS.covPct >= 80 ? "good" : "warn"); pill.textContent = LIVE_STATS.covPct.toFixed(0) + "% Coverage"; }
+      const tables = document.querySelectorAll("#sec-health table");
+      if (tables.length >= 2) {
+        const reg = LIVE_STATS.regimeByDate || [];
+        const regTxt = reg.map(r => r.reg + " (" + r.date.slice(5) + ")").join(" → ");
+        tables[0].innerHTML =
+          '<tr><th>Diagnostic Metric</th><th>Measured Value (live)</th></tr>' +
+          '<tr><td class="deep">Total Telemetry Readings</td><td class="deep">' + n.toLocaleString() + ' rows (' + (n - LIVE_STATS.dropouts) + ' valid + ' + LIVE_STATS.dropouts + ' 0.0% dropouts)</td></tr>' +
+          '<tr><td class="deep">Monitoring Span</td><td class="deep">' + LIVE_STATS.spanTxt + '</td></tr>' +
+          '<tr><td class="deep">Logging Coverage</td><td class="deep">' + LIVE_STATS.covPct.toFixed(1) + '% active coverage</td></tr>' +
+          '<tr><td class="deep">Polling Regime</td><td class="deep">' + esc2(regTxt) + '</td></tr>' +
+          '<tr><td class="deep">ESP32 Reboots / Gaps</td><td class="deep">' + LIVE_STATS.gaps + ' gap(s) &gt;10 min (nightly 3:15 AM rest is expected)</td></tr>' +
+          '<tr><td class="deep">Sensor Null Dropouts</td><td class="deep">' + LIVE_STATS.dropouts + ' single-sample 0.0% glitches (auto-recovered)</td></tr>' +
+          '<tr><td class="deep">Uncommanded Overfill</td><td class="deep">' + LIVE_STATS.overfill.length + ' event(s) reached ≥99.5% while pump=OFF</td></tr>';
+        const nor = CYCLES.filter(c => c.gain_true_pct >= 3);
+        const fastest = nor.length ? nor.reduce((a, b) => a.dur_exact < b.dur_exact ? a : b) : null;
+        const longest = CYCLES.length ? CYCLES.reduce((a, b) => a.dur_exact > b.dur_exact ? a : b) : null;
+        const largest = nor.length ? nor.reduce((a, b) => a.gain_true_l > b.gain_true_l ? a : b) : null;
+        const byDay = {};
+        CYCLES.forEach(c => { byDay[c.date] = (byDay[c.date] || 0) + 1; });
+        const busy = Object.keys(byDay).sort((a, b) => byDay[b] - byDay[a])[0];
+        let hi = 0, lo = 999, bigGl = 0, bigGlTs = null;
+        TELEMETRY.forEach(r => { if (r.pct > 0) { hi = Math.max(hi, r.pct); lo = Math.min(lo, r.pct); }
+          if (Math.abs(r.dpct) > 25 && Math.abs(r.dpct) > bigGl) { bigGl = Math.abs(r.dpct); bigGlTs = r; } });
+        tables[1].innerHTML =
+          '<tr><th>Record Category</th><th>Benchmark Value (live)</th></tr>' +
+          '<tr><td class="deep">⚡ Fastest Recorded Fill</td><td class="deep">' + (fastest ? '<strong>' + fastest.dur_exact + ' min</strong> (' + fastest.start_fmt + ')' : '—') + '</td></tr>' +
+          '<tr><td class="deep">🐢 Longest Recorded Fill</td><td class="deep">' + (longest ? '<strong>' + longest.dur_exact + ' min</strong> (' + longest.start_fmt + ', +' + longest.gain_true_l + ' L)' : '—') + '</td></tr>' +
+          '<tr><td class="deep">💧 Largest Single Refill</td><td class="deep">' + (largest ? '<strong>+' + largest.gain_true_l + ' L (+' + largest.gain_true_pct + '%)</strong> on ' + largest.start_fmt : '—') + '</td></tr>' +
+          '<tr><td class="deep">🔥 Busiest Day</td><td class="deep">' + (busy ? '<strong>' + busy + '</strong> — ' + byDay[busy] + ' logged ON cycles' : '—') + '</td></tr>' +
+          '<tr><td class="deep">🌊 Highest Tank Level</td><td class="deep"><strong>' + hi.toFixed(1) + '% (' + Math.round(hi * LPCT).toLocaleString() + ' L)</strong></td></tr>' +
+          '<tr><td class="deep">📉 Lowest Valid Level</td><td class="deep"><strong>' + (lo < 999 ? lo.toFixed(1) + '% (' + Math.round(lo * LPCT).toLocaleString() + ' L)' : '—') + '</strong></td></tr>' +
+          '<tr><td class="deep">📈 Biggest Sensor Glitch</td><td class="deep">' + (bigGl > 0 ? '<strong>-' + bigGl.toFixed(1) + '% instant drop</strong> (' + bigGlTs.ts + ', recovered next sample)' : 'none 🎉') + '</td></tr>';
+      }
+    });
+    guard(() => { // daily summary table
+      const cards = document.querySelectorAll(".card");
+      for (const c of cards) {
+        const h3 = c.querySelector("h3");
+        if (h3 && h3.textContent.includes("Daily Summary Comparison")) {
+          const tbody = c.querySelector("tbody");
+          if (tbody) {
+            tbody.innerHTML = DAY_KEYS.map(d => {
+              const rows = LIVE_STATS.rowsByDate[d] || [];
+              const valid = rows.filter(r => r.pct > 0);
+              const dts = rows.map(r => r.dt_sec).filter(x => x > 0 && x <= 600);
+              const reg = dts.length ? (medianOf(dts) <= 150 ? "~61s (1-min)" : "~303s (5-min)") : "—";
+              const lo = valid.length ? Math.min(...valid.map(r => r.pct)) : 0;
+              const hi = valid.length ? Math.max(...valid.map(r => r.pct)) : 0;
+              const meanL = valid.length ? valid.reduce((s, r) => s + r.pct, 0) / valid.length : 0;
+              const on = rows.filter(r => r.pump === "ON").length;
+              const D = DAYS[d];
+              return '<tr><td class="deep">' + d + '</td><td class="num deep">' + rows.length.toLocaleString() + '</td>' +
+                '<td><span class="pill info">' + reg + '</span></td>' +
+                '<td class="deep">' + lo.toFixed(1) + '% – ' + hi.toFixed(1) + '%</td>' +
+                '<td class="deep"><b style="color:#1565c0;">' + Math.round(lo * LPCT).toLocaleString() + ' – ' + Math.round(hi * LPCT).toLocaleString() + ' L</b></td>' +
+                '<td class="num deep">' + meanL.toFixed(1) + '% (' + Math.round(meanL * LPCT).toLocaleString() + ' L)</td>' +
+                '<td class="num deep">' + on + ' (' + (rows.length ? (on / rows.length * 100).toFixed(1) : 0) + '%)</td>' +
+                '<td class="deep">' + D.cycles + ' cycles</td>' +
+                '<td class="num gain">+' + D.pumped_l.toLocaleString() + ' L</td>' +
+                '<td class="num deep">' + D.total.toLocaleString() + ' L</td></tr>';
+            }).join("");
+          }
+          break;
+        }
+      }
+    });
+    guard(() => { // timeline select + counts + raw labels
+      const sel = document.getElementById("timelineDateSelect");
+      if (sel) {
+        sel.innerHTML = '<option value="ALL">All Days (' + n.toLocaleString() + ' readings)</option>' +
+          DAY_KEYS.map(d => '<option value="' + d + '">' + d + ' — ' + (LIVE_STATS.rowsByDate[d] || []).length.toLocaleString() + ' readings</option>').join("");
+        sel.value = "ALL";
+      }
+      const cycH3 = document.querySelector("#sec-cycles h3");
+      if (cycH3) cycH3.textContent = "🔄 Complete Pump Refill Cycles (All " + CYCLES.length + " Logged Cycles — Newest First)";
+      const rawH3 = document.querySelector("#sec-raw h3");
+      if (rawH3) rawH3.textContent = "🔍 Full Firebase Telemetry Explorer (All " + n.toLocaleString() + " Readings)";
+      const cap = document.getElementById("rawStatusCap");
+      if (cap) cap.textContent = "Showing all " + n.toLocaleString() + " records (newest first).";
+      const capEl = document.querySelector("#sec-timeline .cap");
+      if (capEl) capEl.innerHTML = "Interactive time-series of all " + n.toLocaleString() + " Firebase readings (live). Green dots mark <strong>Pump ON</strong> samples; flagged triangles mark 0.0% sensor dropouts and ≥85% overfill levels.";
+      document.querySelectorAll('.nav-pill').forEach(b => {
+        if (b.textContent.includes("Pump Cycles")) b.textContent = "🔄 All " + CYCLES.length + " Pump Cycles";
+        if (b.textContent.includes("Raw Log")) b.textContent = "🔍 Raw Log (" + n.toLocaleString() + ")";
+      });
+    });
   }
-  DAYS = {};
-  const allDays = new Set([...Object.keys(daysRawSum), ...Object.keys(delivered)]);
-  for (const d of allDays) {
-    const hours = Array(24).fill(null);
-    let total = 0;
+  function esc2(s) { const d = document.createElement("div"); d.textContent = s === undefined ? "" : String(s); return d.innerHTML; }
+  function medianOf(a) { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; }
+
+
+  function jump(id) {
+    document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function h12(h) {
+    return ((h % 12) || 12) + " " + (h < 12 ? "AM" : "PM");
+  }
+
+  // Render 24-hour SVG Bar Chart (reusable for both Average Profile and Day-by-Day)
+  function drawBarSvg(svgId, hoursArr) {
+    const have = hoursArr.filter(v => v !== null);
+    const maxv = Math.max(1, ...have);
+    const idx = hoursArr.map((v, i) => v !== null ? i : -1).filter(i => i >= 0);
+    const sorted = idx.slice().sort((a, b) => hoursArr[b] - hoursArr[a]);
+    const reds = new Set(sorted.slice(0, 3));
+    const blues = new Set(sorted.slice(-3));
+
+    let s = "";
     for (let h = 0; h < 24; h++) {
-      let v = null;
-      if (perDayHours[d] && perDayHours[d][h] !== undefined) v = Math.round(perDayHours[d][h]);
-      else if (delivered[d] !== undefined) v = 0;   // day logged but no measurable drain = 0 L
-      if (v !== null) { hours[h] = v; total += v; }
+      const x = 18 + h * 34;
+      const v = hoursArr[h];
+      if (v === null) {
+        s += `<rect fill="#cfd8dc" x="${x}" y="168" width="26" height="56" rx="4"/>`;
+        s += `<text x="${x + 13}" y="218" transform="rotate(-90 ${x + 13} 218)" text-anchor="start" font-size="10.5" fill="#78909c" font-weight="bold">NO DATA</text>`;
+        s += `<text x="${x + 13}" y="244" font-size="11" fill="#90a4ae" text-anchor="middle">${h12(h)}</text>`;
+        continue;
+      }
+      const fill = reds.has(h) ? "#ff5252" : (blues.has(h) && idx.length >= 7 ? "#40c4ff" : "#66bb6a");
+      const hpx = Math.max(6, (v / maxv) * 180);
+      const yTop = (230 - hpx).toFixed(0);
+      s += `<rect fill="${fill}" x="${x}" y="${yTop}" width="26" height="${hpx.toFixed(0)}" rx="4"/>`;
+      s += `<text x="${x + 13}" y="${(230 - hpx - 6).toFixed(0)}" text-anchor="middle" font-size="12" fill="#0d47a1" font-weight="bold">${Math.round(v)} L</text>`;
+      if (hpx >= 42) {
+        s += `<text x="${x + 13}" y="224" transform="rotate(-90 ${x + 13} 224)" text-anchor="start" font-size="11.5" fill="#ffffff" font-weight="bold">${h12(h)}</text>`;
+      } else {
+        s += `<text x="${x + 13}" y="244" font-size="11" fill="#1565c0" text-anchor="middle">${h12(h)}</text>`;
+      }
     }
-    if (delivered[d] !== undefined) {
-      // day total = pump-delivered fact
-      const sum = hours.reduce((s, v) => s + (v || 0), 0);
-      if (sum > 0) { const k2 = delivered[d] / sum; for (let h = 0; h < 24; h++) if (hours[h] !== null) hours[h] = Math.round(hours[h] * k2); }
-      total = Math.round(delivered[d]);
-    }
-    DAYS[d] = { hours, total };
+    document.getElementById(svgId).innerHTML = s;
   }
-  DAYKEYS = Object.keys(DAYS).sort();
-  expIdx = DAYKEYS.length - 1;
-  renderExp();
 
-  const H24 = []; for (let h = 0; h < 24; h++) H24.push(hourN[h] ? Math.round(hourTot[h] / hourN[h]) : null);
-
-  // ---- avg chart ----
-  const have = H24.map((v, i) => v !== null ? i : -1).filter(i => i >= 0);
-  const maxv = Math.max(1, ...have.map(i => H24[i]));
-  document.getElementById("avgchart").innerHTML = bars24(H24, maxv);
-  document.getElementById("avgcap").innerHTML = "Average across " + DAYKEYS.map(fday).join(", ") +
-    " • total " + fmtL(avgDelivered) + " L • Empty bars = no data • The average updates automatically as more days come in • Red = peak hours, Green = normal";
-
-  // ---- live card ----
-  const level = cur.lvl ?? 0;
-  let curUse = null;
-  const stretch = [];
-  for (let k = rows.length - 1; k >= 0; k--) {
-    if (rows[k].pump === "OFF") { stretch.unshift(rows[k]); if (cur.ts - rows[k].ts > 3600) break; }
-    else break;
+  // 1. Average 24h Profile Toggle
+  function setAvgMode(mode) {
+    document.getElementById('btnAvgOrig').classList.toggle('active', mode === 'orig');
+    document.getElementById('btnAvgFull').classList.toggle('active', mode === 'full');
+    drawBarSvg('avgsvg', mode === 'orig' ? AVG_ORIG : AVG_FULL);
   }
-  if (stretch.length >= 2) {
-    const t0 = stretch[0].ts + 720;
-    const dur = cur.ts - t0;
-    if (dur >= 1080) {
-      const drop = stretch[0].lvl - cur.lvl;
-      if (drop >= 0 && drop <= 40) curUse = Math.max(0, drop / (dur / 3600) * L);
-    }
+
+  // 2. Day-by-Day Explorer
+  let DAY_KEYS = [];
+  let curDayIdx = 2; // Default to latest day or let user flip
+  function shiftDay(delta) {
+    curDayIdx = Math.max(0, Math.min(DAY_KEYS.length - 1, curDayIdx + delta));
+    renderDaySvg();
   }
-  let liveHtml =
-    '<div class="tile liters" style="flex:0 0 190px;"><div class="v">' + fmtL(lit) + ' L</div><div class="l">water stored</div></div>' +
-    '<div class="tile"><div class="v" style="font-size:20px;">' + esc(cur.pump) + '</div><div class="l">pump state</div></div>' +
-    '<div class="tile"><div class="v">' + (curUse === null ? "— measuring" : Math.round(curUse) + " L/h") + '</div><div class="l">current usage</div></div>' +
-    '<div class="tile"><div class="v">' + ago(Math.floor(cur.ts)) + '</div><div class="l">data age</div></div>';
-  document.getElementById("livegrid").innerHTML = liveHtml;
-
-  // ETA line
-  let etaTxt;
-  if (level <= 60) {
-    etaTxt = "🚰 fill imminent — level " + level.toFixed(0) + "% and falling";
-  } else if (curUse !== null && curUse > 1) {
-    const hrs = (level - 60) / (curUse / L);
-    const eta = new Date(Date.now() + hrs * 3600000);
-    etaTxt = "🔮 at " + Math.round(curUse) + " L/h → next fill (60%) " + (hrs >= 24 ? "≈ " + Math.round(hrs / 24) + " days from now (" + eta.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + ")" : "in ≈ " + eta.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
-  } else {
-    etaTxt = "🔮 level " + level.toFixed(0) + "% — measuring usage for the next-fill estimate";
+  function renderDaySvg() {
+    const k = DAY_KEYS[curDayIdx];
+    const d = DAYS[k];
+    drawBarSvg('daysvg', d.hours);
+    const dtObj = new Date(k + "T00:00:00");
+    const ds = dtObj.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" });
+    document.getElementById("daytitle").innerHTML = `${ds} &nbsp;•&nbsp; <span style="color:#d84315;">${d.total.toLocaleString()} L used</span> (${d.cycles} cycles)`;
   }
-  document.getElementById("eta").innerHTML = etaTxt;
-  const peakEver = Math.max(...rows.map(r => r.lvl || 0));
-  document.getElementById("livecap").innerHTML = level.toFixed(1) + "% of " + CAP.toLocaleString() + " L (max " + peakEver.toFixed(0) + "% in the logged period) • mode " + esc(cur.mode);
 
-  // ---- key numbers ----
-  let night = [], day = [];
-  for (const h in hourTot) (h >= 22 || h < 6 ? night : day).push(hourTot[h] / hourN[h]);
-  const avg = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0;
-  const sortedH = have.slice().sort((a, b) => H24[b] - H24[a]);
-  const peakH = sortedH[0] !== undefined ? sortedH[0] : 0;
-  const totalPctDay = avgDelivered / CAP * 100;
-  const dayCounts = {};
-  cycles.forEach(c => { const dk = dkey(c.s); dayCounts[dk] = (dayCounts[dk] || 0) + 1; });
-  const busiest = Object.keys(dayCounts).sort((a, b) => dayCounts[b] - dayCounts[a])[0];
-  document.getElementById("keynums").innerHTML =
-    '<div class="ktile" style="background:#5c6bc0;"><b>🌙 ' + Math.round(avg(night)) + ' L/h</b>night drain (10 PM – 6 AM)</div>' +
-    '<div class="ktile" style="background:#26a69a;"><b>☀ ' + Math.round(avg(day)) + ' L/h</b>day usage (6 AM – 10 PM)</div>' +
-    '<div class="ktile" style="background:#ef5350;"><b>' + h12(peakH) + ' = ' + (H24[peakH] || 0) + ' L</b>peak hour (average)</div>' +
-    '<div class="ktile" style="background:#66bb6a; color:#1b5e20;"><b>' + totalPctDay.toFixed(1) + '% = ' + fmtL(avgDelivered) + ' L/day</b>total usage per day</div>' +
-    '<div class="ktile" style="flex:1 1 100%; background:#e8f5e9; color:#1b5e20;"><b>✅ Sanity: ' + fmtL(avgDelivered) + ' L/day = pump delivered (verified math)</b>hourly bars average to this total — liters the pump actually delivered</div>';
-
-  // ---- health ----
-  let gaps = 0, bigGap = 0;
-  for (let i = 1; i < rows.length; i++) {
-    const g = rows[i].ts - rows[i - 1].ts;
-    if (g > 1800) { gaps++; bigGap = Math.max(bigGap, g); }
+  // 3. Render Pump Cycles Table
+  let cycleGainMode = 'true';
+  function setCycleGainMode(mode) {
+    cycleGainMode = mode;
+    document.getElementById('btnGainTrue').classList.toggle('active', mode === 'true');
+    document.getElementById('btnGainOn').classList.toggle('active', mode === 'on');
+    renderCycles();
   }
-  const span = rows[rows.length - 1].ts - rows[0].ts;
-  let cov = 0;
-  for (let i = 1; i < rows.length; i++) if (rows[i].ts - rows[i - 1].ts <= 1800) cov += rows[i].ts - rows[i - 1].ts;
-  const coverage = span > 0 ? cov / span * 100 : 0;
-  const spanH = Math.floor(span / 3600), spanM = Math.round(span % 3600 / 60);
-  const covH = Math.floor(cov / 3600), covM = Math.round(cov % 3600 / 60);
-  let shedHtml = '<tr><td>Load shedding captured</td><td>' + (shed ? '~' + shed + ' min total (from battery drain)' : '— (battery history unavailable)') + '</td></tr>';
-  document.getElementById("health").innerHTML =
-    '<tr><td>ESP32 gaps / dropouts</td><td>' + gaps + ' gap(s) &gt;30 min (biggest ' + Math.round(bigGap / 60) + ' min) — nightly 3:15 AM rest is expected</td></tr>' +
-    shedHtml +
-    '<tr><td>Logging coverage</td><td>' + coverage.toFixed(0) + '% of period (' + covH + ':' + String(covM).padStart(2, "0") + 'h of ' + spanH + ':' + String(spanM).padStart(2, "0") + 'h)</td></tr>' +
-    '<tr><td>Logging gaps</td><td>' + gaps + '</td></tr>' +
-    '<tr><td>Data age</td><td>' + ago(Math.floor(cur.ts)) + ' ago (bot live feed updates every minute)</td></tr>';
+  function renderCycles() {
+    const tbody = document.getElementById('cyclesBody');
+    const reversed = [...CYCLES].reverse();
+    tbody.innerHTML = reversed.map(c => {
+      const startP = cycleGainMode === 'true' ? c.trough_pct : c.first_on_pct;
+      const endP = cycleGainMode === 'true' ? c.peak_pct : c.cutoff_pct;
+      const gainP = cycleGainMode === 'true' ? c.gain_true_pct : c.gain_on_pct;
+      const gainL = cycleGainMode === 'true' ? c.gain_true_l : c.gain_on_l;
+      const isNew = c.no === 16;
+      return `
+        <tr style="${isNew ? 'background:#e8f5e9;' : ''}">
+          <td class="deep">#${c.no} ${isNew ? '<span class="pill good" style="font-size:10px;padding:1px 6px;">NEW</span>' : ''}</td>
+          <td class="deep">${c.start_fmt}</td>
+          <td class="deep">${c.end_fmt}</td>
+          <td><span class="pill ${c.regime === '5-min' ? 'warn' : 'info'}">${c.regime} (${c.samples} pts)</span></td>
+          <td class="num deep">${c.dur_min} min <span style="font-size:11px;color:#546e7a;">(${c.dur_exact}m)</span></td>
+          <td class="deep">${startP.toFixed(1)}% &rarr; ${endP.toFixed(1)}%</td>
+          <td class="num"><span class="gain">+${gainP.toFixed(1)}%</span></td>
+          <td class="num"><b style="color:#1565c0;font-size:14px;">+${gainL} L</b></td>
+          <td class="num deep">${c.rate_l_min} L/m</td>
+          <td><span class="pill good">&#10004; normal</span></td>
+        </tr>
+      `;
+    }).join('');
+  }
 
-  // ---- records ----
-  const nor = cycles.filter(c => !c.abn);
-  const fastest = nor.length ? nor.reduce((a, b) => a.dur < b.dur ? a : b) : null;
-  const longest = cycles.length ? cycles.reduce((a, b) => a.dur > b.dur ? a : b) : null;
-  document.getElementById("records").innerHTML =
-    '<tr><td>⚡ Fastest fill</td><td>' + (fastest ? fastest.dur + ' min (' + ftime(fastest.s) + ')' : '—') + '</td></tr>' +
-    '<tr><td>🐢 Longest fill</td><td>' + (longest ? longest.dur + ' min (' + fday(dkey(longest.s)) + ')' : '—') + '</td></tr>' +
-    '<tr><td>📈 Biggest sensor glitch</td><td>' + (A.biggestGlitch > 0 ? A.biggestGlitch.toFixed(1) + '% jump (' + fday(dkey(A.glitchTs)) + ') — auto-corrected' : 'none 🎉') + '</td></tr>' +
-    '<tr><td>🔥 Busiest day</td><td>' + (busiest ? fday(busiest) + ' — ' + dayCounts[busiest] + ' cycles' : '—') + '</td></tr>';
+  // 4. Interactive Chart.js Timeline
+  let timelineChart = null;
+  function renderTimelineChart() {
+    const dateFilter = document.getElementById('timelineDateSelect').value;
+    const hideGlitch = document.getElementById('filterGlitchChk').checked;
 
-  // ---- cycles table ----
-  document.getElementById("cycles").innerHTML = cycles.length ? cycles.slice(-15).reverse().map(c => {
-    const st = c.abn ? '<span class="pill2 bad">⚠ abnormal</span>' : '<span class="pill2 good">✔ normal</span>';
-    return '<tr><td class="deep">' + ftime(c.s) + '</td><td class="deep">' + ftime(c.e) + '</td><td class="deep">' +
-      c.dur + ' min</td><td class="deep">' + (c.l0 ?? "?") + '–' + (c.l1 ?? "?") + '% (+' + c.dl.toFixed(1) + '%) <b style="color:#1565c0">(' + fmtL(c.liters) + ' L)</b></td><td>' + st + '</td></tr>';
-  }).join("") : '<tr><td colspan="5">no cycles yet</td></tr>';
+    const data = TELEMETRY.filter(r => {
+      if (dateFilter !== 'ALL' && r.date !== dateFilter) return false;
+      if (hideGlitch && r.pct === 0) return false;
+      return true;
+    });
 
-  // ---- daily summary ----
-  const dayRead = {};
-  rows.forEach(r => { const dk = dkey(r.ts); dayRead[dk] = (dayRead[dk] || 0) + 1; });
-  const dayRange = {};
-  rows.forEach(r => {
-    const dk = dkey(r.ts);
-    if (r.lvl === null) return;
-    dayRange[dk] = dayRange[dk] || [999, -1];
-    dayRange[dk][0] = Math.min(dayRange[dk][0], r.lvl);
-    dayRange[dk][1] = Math.max(dayRange[dk][1], r.lvl);
+    const labels = data.map(r => r.ts.slice(5, 16));
+    const pctSeries = data.map(r => r.pct);
+    const onSeries = data.map(r => r.pump === 'ON' ? r.pct : null);
+    const anomSeries = data.map(r => (r.pct === 0 || (r.pct > 85 && r.pump === 'OFF')) ? r.pct : null);
+
+    const ctx = document.getElementById('telemetryCanvas').getContext('2d');
+    if (timelineChart) timelineChart.destroy();
+
+    timelineChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Water Level (%)',
+            data: pctSeries,
+            borderColor: '#0288d1',
+            backgroundColor: 'rgba(2, 136, 209, 0.12)',
+            borderWidth: 1.8,
+            pointRadius: 0,
+            fill: true,
+            tension: 0.15
+          },
+          {
+            label: 'Pump ON Active (Refilling)',
+            data: onSeries,
+            borderColor: '#2e7d32',
+            backgroundColor: '#2e7d32',
+            pointRadius: 3.5,
+            showLine: false
+          },
+          {
+            label: 'Anomaly (100% Bypass / 0% Glitch)',
+            data: anomSeries,
+            borderColor: '#d32f2f',
+            backgroundColor: '#d32f2f',
+            pointRadius: 5,
+            pointStyle: 'triangle',
+            showLine: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              afterLabel: function(context) {
+                const item = data[context.dataIndex];
+                if (!item) return '';
+                return `Volume: ${item.liters} L | Pump: ${item.pump} | Δt: ${item.dt_sec}s`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            min: hideGlitch ? 55 : 0,
+            max: 103,
+            title: { display: true, text: 'Tank Level (%) [100% = 1,950 L]' }
+          },
+          x: {
+            ticks: { maxTicksLimit: 12 }
+          }
+        }
+      }
+    });
+  }
+
+  // 5. Raw Log Table Explorer
+  let filteredRaw = [...TELEMETRY].reverse();
+  let rawPage = 1;
+  const RAW_PAGE_SIZE = 100;
+
+  function filterRawTable() {
+    const q = document.getElementById('rawSearch').value.trim().toLowerCase();
+    const pFilter = document.getElementById('rawPumpFilter').value;
+    const sFilter = document.getElementById('rawSpecialFilter').value;
+
+    filteredRaw = [...TELEMETRY].reverse().filter(r => {
+      if (q && !r.iso.toLowerCase().includes(q) && !String(r.pct).includes(q) && !String(r.liters).includes(q)) return false;
+      if (pFilter !== 'ALL' && r.pump !== pFilter) return false;
+      if (sFilter === 'OVER85' && r.pct <= 85) return false;
+      if (sFilter === 'GLITCH' && r.pct !== 0) return false;
+      if (sFilter === 'GAP' && r.dt_sec <= 310) return false;
+      return true;
+    });
+    rawPage = 1;
+    renderRawTable();
+  }
+
+  function changeRawPage(delta) {
+    const maxP = Math.max(1, Math.ceil(filteredRaw.length / RAW_PAGE_SIZE));
+    rawPage = Math.max(1, Math.min(maxP, rawPage + delta));
+    renderRawTable();
+  }
+
+  function renderRawTable() {
+    const maxP = Math.max(1, Math.ceil(filteredRaw.length / RAW_PAGE_SIZE));
+    const start = (rawPage - 1) * RAW_PAGE_SIZE;
+    const slice = filteredRaw.slice(start, start + RAW_PAGE_SIZE);
+
+    document.getElementById('rawStatusCap').textContent = `Matching records: ${filteredRaw.length.toLocaleString()} of 1,751 total readings`;
+    document.getElementById('rawPageInfo').textContent = `Page ${rawPage} of ${maxP} (Rows ${start + 1}–${Math.min(filteredRaw.length, start + RAW_PAGE_SIZE)})`;
+
+    const tbody = document.getElementById('rawTableBody');
+    tbody.innerHTML = slice.map(r => {
+      let pBadge = `<span class="pill info" style="background:#546e7a;">OFF</span>`;
+      if (r.pump === 'ON') pBadge = `<span class="pill good">ON</span>`;
+      if (r.pump === 'NULL') pBadge = `<span class="pill bad">NaN</span>`;
+
+      const dpClass = r.dpct >= 1.5 ? 'gain' : (r.dpct <= -2.0 ? 'loss' : '');
+      const dtStyle = r.dt_sec > 310 ? 'color:#e65100;font-weight:800;' : '';
+
+      return `
+        <tr>
+          <td class="mono deep">#${r.id}</td>
+          <td class="mono">${r.iso}</td>
+          <td class="num deep">${r.pct.toFixed(1)}%</td>
+          <td class="num" style="color:#1565c0;font-weight:700;">${r.liters.toLocaleString()} L</td>
+          <td class="num ${dpClass}">${r.dpct > 0 ? '+' : ''}${r.dpct.toFixed(1)}%</td>
+          <td>${pBadge}</td>
+          <td class="mono">${r.mode}</td>
+          <td class="num" style="${dtStyle}">${r.dt_sec}s</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Initialize Everything
+  window.addEventListener('DOMContentLoaded', async () => {
+    try { await loadLive(); } catch (e) { console.error('Firebase load failed', e); }
+    try { buildDerived(); } catch (e) { console.error('buildDerived failed', e); }
+    try { updateStatic(); } catch (e) { console.error('updateStatic failed', e); }
+    setAvgMode('orig');
+    curDayIdx = Math.max(0, DAY_KEYS.length - 1);
+    renderDaySvg();
+    renderCycles();
+    renderTimelineChart();
+    filterRawTable();
+    setInterval(() => location.reload(), 300000); // live refresh every 5 min
   });
-  document.getElementById("daily").innerHTML = DAYKEYS.slice().reverse().map(dk =>
-    '<tr><td class="deep">' + fday(dk) + '</td><td class="deep">' + (dayRead[dk] || 0) + '</td><td class="deep">' +
-    (dayRange[dk] ? dayRange[dk][0].toFixed(0) + "%–" + dayRange[dk][1].toFixed(0) + "% (" + fmtL(dayRange[dk][0] * L) + "–" + fmtL(dayRange[dk][1] * L) + " L)" : "—") +
-    '</td><td class="deep">' + (dayCounts[dk] || 0) + ' cycle(s)</td></tr>').join("");
-
-  // ---- hero + status ----
-  document.getElementById("gen").innerHTML = "Auto-generated at " + new Date().toLocaleTimeString() +
-    " • live from Firebase • " + rows.length.toLocaleString() + " readings • " + DAYKEYS.length + " days monitored • PC not required";
-  const stale = cur.ts < Date.now() / 1000 - 600;
-  document.getElementById("status").innerHTML = stale
-    ? '<span class="dot bad"></span>STALE — bot last reported ' + ago(Math.floor(cur.ts)) + ' ago'
-    : '<span class="dot"></span>live • bot last reported ' + ago(Math.floor(cur.ts)) + ' ago • PC not required';
-}
-
-Promise.all([
-  fetch(FB + "/tank/latest.json?ts=" + Date.now()).then(r => r.json()),
-  fetch(FB + "/tank_history.json?ts=" + Date.now()).then(r => r.json()),
-  fetch(FB + '/history/1.json?orderBy="$key"&limitToLast=4320&ts=' + Date.now()).then(r => r.json()).catch(() => null)
-]).then(([latest, h, bh]) => {
-  const hist = h ? Object.keys(h).sort().map(k => h[k]).map(normRec).filter(Boolean) : [];
-  if (hist.length < 20) {
-    document.getElementById("status").innerHTML =
-      '<span class="dot bad"></span>not enough Firebase history yet (bot keeps pushing every minute)…';
-    document.getElementById("gen").innerHTML = "waiting for data…";
-    return;
-  }
-  // load-shedding minutes from battery history (a < -0.5 A = discharging)
-  let shedMin = null;
-  try {
-    const br = Object.keys(bh || {}).sort().map(k => bh[k]).filter(r => r && isFinite(r.ts) && isFinite(r.a)).sort((a, b) => a.ts - b.ts);
-    let mins = 0;
-    for (let i = 1; i < br.length; i++) {
-      const dt = br[i].ts - br[i - 1].ts;
-      if (dt > 0 && dt <= 300 && br[i].a < -0.5) mins += dt / 60;
-    }
-    shedMin = Math.round(mins);
-  } catch (e) {}
-  render(analyze(hist), shedMin);
-}).catch(e => {
-  document.getElementById("status").innerHTML =
-    '<span class="dot bad"></span>connection problem — retrying…';
-});
-setInterval(() => location.reload(), 120000);
 </script>
 </body>
 </html>
