@@ -434,6 +434,7 @@
     <button class="nav-pill" onclick="jump('sec-hourly')">🕐 24h Usage Profile</button>
     <button class="nav-pill" onclick="jump('sec-daybyday')">📆 Day-by-Day Explorer</button>
     <button class="nav-pill" onclick="jump('sec-timeline')">📈 Full Telemetry Chart</button>
+    <button class="nav-pill" onclick="jump('sec-clocks')">🕐 Pump Clocks (AM/PM)</button>
     <button class="nav-pill" onclick="jump('sec-health')">🩺 Health & Records</button>
     <button class="nav-pill" onclick="jump('sec-cycles')">🔄 All 16 Pump Cycles</button>
     <button class="nav-pill" onclick="jump('sec-anomalies')">⚠️ Anomalies & Dropouts</button>
@@ -582,6 +583,16 @@
     <div class="chart-box">
       <canvas id="telemetryCanvas"></canvas>
     </div>
+  </div>
+
+  <!-- 5b. PUMP ON CLOCKS (AM / PM) -->
+  <div id="sec-clocks" class="card">
+    <div class="card-head">
+      <h3>🕐 When the Pump Ran — AM &amp; PM Clocks</h3>
+      <span class="pill info" id="clockspan"></span>
+    </div>
+    <div class="cap">Two 12-hour clock faces, like wall clocks: each slice is one hour of the day (top = 12 o&#39;clock, going clockwise).</div>
+    <div id="clockwrap" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;"></div>
   </div>
 
   <!-- 6. SYSTEM HEALTH & RECORDS (SIDE BY SIDE) -->
@@ -1492,6 +1503,81 @@
     }).join('');
   }
 
+  // ===== Pump Clocks: two 12-hour clock faces (AM / PM) showing when the pump ran =====
+  function pumpClockData() {
+    const perDay = {};
+    TELEMETRY.forEach((r, i) => {
+      if (r.pump !== "ON") return;
+      const nxt = TELEMETRY[i + 1];
+      let mins = 1;
+      if (nxt && nxt.date === r.date) mins = Math.min(120, (nxt._e - r._e) / 60);
+      perDay[r.date] = perDay[r.date] || {};
+      perDay[r.date][r.hour] = (perDay[r.date][r.hour] || 0) + Math.min(mins, 60);
+    });
+    const days = Object.keys(perDay).length || 1;
+    const am = new Array(12).fill(0), pm = new Array(12).fill(0);
+    for (const d in perDay)
+      for (let h = 0; h < 24; h++) {
+        const v = perDay[d][h] || 0;
+        if (h < 12) am[h] += v; else pm[h - 12] += v;
+      }
+    return { am: am.map(v => v / days), pm: pm.map(v => v / days), days };
+  }
+  function clockArcPath(cx, cy, r0, r1, a0, a1) {
+    const rad = a => (a - 90) * Math.PI / 180;
+    const x = (r, a) => (cx + r * Math.cos(rad(a))).toFixed(2);
+    const y = (r, a) => (cy + r * Math.sin(rad(a))).toFixed(2);
+    const large = (a1 - a0) > 180 ? 1 : 0;
+    return "M " + x(r1, a0) + " " + y(r1, a0) +
+      " A " + r1 + " " + r1 + " 0 " + large + " 1 " + x(r1, a1) + " " + y(r1, a1) +
+      " L " + x(r0, a1) + " " + y(r0, a1) +
+      " A " + r0 + " " + r0 + " 0 " + large + " 0 " + x(r0, a0) + " " + y(r0, a0) + " Z";
+  }
+  function drawPumpClock(id, vals, title, sub) {
+    const CX = 170, CY = 170, R0 = 92, R1 = 132;
+    const p2 = n => String(n).padStart(2, "0");
+    let s = '<svg viewBox="0 0 340 340" width="300" style="max-width:100%;">';
+    // hour slots (background ring)
+    for (let p = 0; p < 12; p++) {
+      s += '<path d="' + clockArcPath(CX, CY, R0, R1, p * 30 + 1, (p + 1) * 30 - 1) + '" fill="#eceff1"/>';
+    }
+    // green arcs: minutes ON (avg) in that hour
+    vals.forEach((mins, p) => {
+      if (mins <= 0.05) return;
+      const span = Math.min(30, mins / 60 * 30);
+      s += '<path d="' + clockArcPath(CX, CY, R0, R1, p * 30 + 1, p * 30 + 1 + span) + '" fill="#2e7d32" stroke="none"><title>' +
+        (p === 0 ? 12 : p) + " " + title.split(" ")[0] + ": " + Math.round(mins) + " min ON (avg)</title></path>";
+    });
+    // hour labels
+    for (let p = 0; p < 12; p++) {
+      const rad = (p * 30 - 90) * Math.PI / 180;
+      const lx = (CX + 152 * Math.cos(rad)).toFixed(1), ly = (CY + 152 * Math.sin(rad)).toFixed(1);
+      s += '<text x="' + lx + '" y="' + ly + '" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="700" fill="#546e7a">' + (p === 0 ? 12 : p) + "</text>";
+    }
+    // center
+    const tot = Math.round(vals.reduce((x, y) => x + y, 0));
+    s += '<circle cx="' + CX + '" cy="' + CY + '" r="58" fill="#ffffff"/>';
+    s += '<text x="' + CX + '" y="' + (CY - 6) + '" text-anchor="middle" font-size="24" font-weight="900" fill="#1b5e20">' + tot + 'm</text>';
+    s += '<text x="' + CX + '" y="' + (CY + 16) + '" text-anchor="middle" font-size="11" fill="#78909c">avg ON / day</text>';
+    s += '<text x="' + CX + '" y="' + (CY + 36) + '" text-anchor="middle" font-size="12" font-weight="800" fill="#0d47a1">' + esc2(title) + "</text>";
+    s += '<text x="' + CX + '" y="' + (CY + 54) + '" text-anchor="middle" font-size="10.5" fill="#78909c">' + esc2(sub) + "</text>";
+    s += "</svg>";
+    document.getElementById(id).innerHTML = s;
+  }
+  function renderPumpClocks() {
+    const el = document.getElementById("clockwrap");
+    if (!el || !TELEMETRY.length) return;
+    const d = pumpClockData();
+    const sp = document.getElementById("clockspan");
+    if (sp) sp.textContent = "Averaged across " + d.days + " logged day" + (d.days > 1 ? "s" : "");
+    const rangeTxt = DAY_KEYS.length ? DAY_KEYS.map(k => k.slice(5)).join(" – ") : "";
+    el.innerHTML = '<div style="text-align:center;" id="clkam"></div><div style="text-align:center;" id="clkpm"></div>';
+    drawPumpClock("clkam", d.am, "AM (12 AM – 11 AM)", d.days + " day" + (d.days > 1 ? "s" : "") + " avg • " + rangeTxt);
+    drawPumpClock("clkpm", d.pm, "PM (12 PM – 11 PM)", d.days + " day" + (d.days > 1 ? "s" : "") + " avg • " + rangeTxt);
+    el.insertAdjacentHTML("afterend",
+      '<div class="cap" style="text-align:center;">🟢 <strong style="color:#2e7d32;">Green arc = average minutes the pump spent ON in that hour</strong> (top = 12 o\'clock, clockwise) • gray = pump never ran in that hour on average</div>');
+  }
+
   // Initialize Everything
   window.addEventListener('DOMContentLoaded', async () => {
     try { await loadLive(); } catch (e) { console.error('Firebase load failed', e); }
@@ -1502,6 +1588,7 @@
     renderDaySvg();
     renderCycles();
     renderTimelineChart();
+    renderPumpClocks();
     filterRawTable();
     setInterval(() => location.reload(), 300000); // live refresh every 5 min
   });
