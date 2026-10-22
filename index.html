@@ -253,14 +253,17 @@ function render(d){
 
 fetch("data.json?ts=" + Date.now()).then(r=>r.json()).then(d=>{
   // live tank overlay: 1-minute updates straight from the ESP bot via Firebase
-  return fetch(FB + "/tank/latest.json?ts=" + Date.now()).then(r=>r.json()).then(fb=>{
-    if (fb && fb.ts && (Date.now()/1000 - fb.ts) < 600 && fb.online) {
-      d.tank = {level: fb.lvl, liters: Math.round(fb.lvl * 19.5),
-                pump: fb.pump, capacity_l: 1950,
-                age_min: Math.round((Date.now()/1000 - fb.ts)/60), live: true};
-    }
-  }).catch(()=>{});
-  return d;
+  return fetch(FB + "/tank/latest.json?ts=" + Date.now())
+    .then(r=>r.json())
+    .then(fb=>{
+      if (fb && fb.ts && (Date.now()/1000 - fb.ts) < 600 && fb.online) {
+        d.tank = {level: fb.lvl, liters: Math.round(fb.lvl * 19.5),
+                  pump: fb.pump, capacity_l: 1950,
+                  age_min: Math.round((Date.now()/1000 - fb.ts)/60), live: true};
+      }
+    })
+    .catch(()=>{})
+    .then(()=>d);                     // always pass the data through
 }).then(d=>{
   render(d);
 }).catch(e=>{
