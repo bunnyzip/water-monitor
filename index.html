@@ -165,6 +165,8 @@ function lineChart(series){
   return s + '</svg>';
 }
 
+const FB = "https://battery-monitor-a1063-default-rtdb.asia-southeast1.firebasedatabase.app";
+
 function render(d){
   const t = d.tank || {};
   document.getElementById("gauge").innerHTML = arc(t.level||0, (t.level||0)>50?"#2ecc71":"#f39c12", Math.round(t.level||0)+"%", "of "+(t.capacity_l||1950)+" L");
