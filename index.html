@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="refresh" content="120">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Water Monitor — Live</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; font-family:'Segoe UI',Arial,sans-serif; background:linear-gradient(135deg,#0f2027,#203a43 50%,#2c5364); min-height:100vh; color:#263238; }
+.wrap { max-width:900px; margin:0 auto; padding:18px 14px 40px; }
+h1 { text-align:center; color:#e3f2fd; font-size:26px; margin:10px 0 4px; }
+.status { text-align:center; font-size:14px; margin-bottom:16px; }
+.dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; background:#2ecc71; }
+.dot.stale { background:#e74c3c; }
+.card { background:#fff; border-radius:14px; padding:16px 18px; margin-bottom:16px; box-shadow:0 3px 12px rgba(0,0,0,.35); }
+.card h3 { margin:0 0 12px; color:#0d47a1; font-size:17px; border-bottom:3px solid #00c6ff; display:inline-block; padding-bottom:2px; }
+.grid { display:flex; gap:12px; flex-wrap:wrap; }
+.tile { flex:1 1 140px; background:#e3f2fd; border-radius:10px; padding:12px; text-align:center; }
+.tile .v { font-size:26px; font-weight:800; color:#0d47a1; }
+.tile .l { font-size:12px; color:#546e7a; }
+.big { font-size:38px; font-weight:900; }
+.pill { display:inline-block; padding:6px 18px; border-radius:20px; font-weight:800; font-size:15px; color:#fff; }
+.pill.on { background:#ef6c00; }
+.pill.off { background:#78909c; }
+.pill.bad { background:#e53935; }
+table { border-collapse:collapse; width:100%; font-size:13.5px; }
+th { background:#1565c0; color:#fff; padding:6px 10px; text-align:left; }
+td { padding:6px 10px; }
+tr:nth-child(even) td { background:#e3f2fd; }
+.cap { font-size:12px; color:#546e7a; margin:6px 0 0; }
+.foot { text-align:center; color:#b0bec5; font-size:12px; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>💧 Water Monitor — Live</h1>
+<div class="status" id="status">loading…</div>
+
+<div class="card">
+  <h3>🔴 Tank right now</h3>
+  <div class="grid">
+    <div class="tile" style="flex:0 0 200px;"><div id="gauge"></div></div>
+    <div class="tile"><div class="v big" id="liters">—</div><div class="l">water stored</div></div>
+    <div class="tile"><div id="pump" class="pill off">—</div><div class="l" style="margin-top:8px;">pump</div></div>
+    <div class="tile"><div class="v" id="age">—</div><div class="l">data age</div></div>
+  </div>
+  <div class="cap" id="tankcap"></div>
+</div>
+
+<div class="card">
+  <h3>🕐 Today — liters per hour</h3>
+  <div id="todaychart"></div>
+  <div class="cap">red = peak hours • blue = quietest • gray = no data that hour</div>
+</div>
+
+<div class="card">
+  <h3>📅 Last 7 days — total usage</h3>
+  <div id="weekchart"></div>
+</div>
+
+<div class="card">
+  <h3>📈 Tank level — last 48 hours</h3>
+  <div id="linechart"></div>
+</div>
+
+<div class="card">
+  <h3>🩺 System</h3>
+  <div id="summary"></div>
+</div>
+
+<div class="foot">Data collected by the PC logger (5-minute readings) → GitHub • page refreshes every 2 min<br>
+MAHMUD MONITOR • tank 2,000 L (100% = 1,950 L)</div>
+</div>
+
+<script>
+const H = [["12 AM",0],["1 AM",1],["2 AM",2],["3 AM",3],["4 AM",4],["5 AM",5],["6 AM",6],["7 AM",7],["8 AM",8],["9 AM",9],["10 AM",10],["11 AM",11],["12 PM",12],["1 PM",13],["2 PM",14],["3 PM",15],["4 PM",16],["5 PM",17],["6 PM",18],["7 PM",19],["8 PM",20],["9 PM",21],["10 PM",22],["11 PM",23]];
+function h12(h){ return ((h%12)||12) + " " + (h<12?"AM":"PM"); }
+function ago(ep){ const s=Math.floor(Date.now()/1000)-ep; if(s<90)return s+"s ago"; if(s<5400)return Math.floor(s/60)+"m ago"; if(s<86400)return Math.floor(s/3600)+"h ago"; return Math.floor(s/86400)+"d ago"; }
+function esc(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+
+function arc(pct, color, label, sub){
+  const r=62, cx=75, cy=82, start=150, sweep=240*(Math.min(100,Math.max(0,pct))/100);
+  const pol=d=>[cx+r*Math.cos(d*Math.PI/180), cy+r*Math.sin(d*Math.PI/180)];
+  const [sx,sy]=pol(start), [ex,ey]=pol(start+sweep);
+  return `<svg viewBox="0 0 150 110" width="170">
+    <path d="M ${sx} ${sy} A ${r} ${r} 0 1 1 ${pol(start+240)[0]} ${pol(start+240)[1]}" fill="none" stroke="rgba(21,101,192,.25)" stroke-width="11" stroke-linecap="round"/>
+    ${sweep>1?`<path d="M ${sx} ${sy} A ${r} ${r} 0 ${sweep>180?1:0} 1 ${ex} ${ey}" fill="none" stroke="${color}" stroke-width="11" stroke-linecap="round"/>`:""}
+    <text x="75" y="80" text-anchor="middle" font-size="24" font-weight="900" fill="#0d47a1">${label}</text>
+    <text x="75" y="98" text-anchor="middle" font-size="10" fill="#78909c">${sub}</text></svg>`;
+}
+
+function hourlyBars(hours, maxv){
+  let s = '<svg viewBox="0 0 860 250" width="100%">';
+  hours.forEach((v,h)=>{
+    const x = 18 + h*34;
+    if (v === null){
+      s += `<rect fill="#cfd8dc" x="${x}" y="168" width="26" height="56" rx="4"/>`;
+      s += `<text x="${x+13}" y="218" transform="rotate(-90 ${x+13} 218)" text-anchor="start" font-size="10.5" fill="#78909c" font-weight="bold">NO DATA</text>`;
+    } else {
+      const hpx = Math.max(5, v/maxv*175);
+      s += `<rect fill="#66bb6a" x="${x}" y="${230-hpx}" width="26" height="${hpx}" rx="4"/>`;
+      s += `<text x="${x+13}" y="${230-hpx-6}" text-anchor="middle" font-size="11" fill="#0d47a1" font-weight="bold">${v} L</text>`;
+    }
+    s += `<text x="${x+13}" y="244" font-size="10" fill="#546e7a" text-anchor="middle">${H[h][0]}</text>`;
+  });
+  return s + '</svg>';
+}
+
+function dayBars(days){
+  const vals = days.map(d=>d.total);
+  const maxv = Math.max(1, ...vals);
+  let s = '<svg viewBox="0 0 860 230" width="100%">';
+  days.forEach((d,i)=>{
+    const w = 700/Math.max(1,days.length) - 14, x = 30 + i*(700/Math.max(1,days.length)) + 7;
+    const hpx = Math.max(5, d.total/maxv*150);
+    s += `<rect fill="#42a5f5" x="${x}" y="${200-hpx}" width="${w}" height="${hpx}" rx="5"/>`;
+    s += `<text x="${x+w/2}" y="${200-hpx-6}" text-anchor="middle" font-size="12" fill="#0d47a1" font-weight="bold">${d.total} L</text>`;
+    const dt = new Date(d.date+"T00:00:00");
+    s += `<text x="${x+w/2}" y="218" text-anchor="middle" font-size="10.5" fill="#546e7a">${dt.toLocaleDateString("en-US",{month:"short",day:"numeric"})}</text>`;
+  });
+  return s + '</svg>';
+}
+
+function lineChart(series){
+  if (!series || series.length < 2) return '<div class="cap">not enough data yet</div>';
+  const W=860, Hh=200, x0=10, x1=W-10;
+  const t0 = new Date(series[0][0]).getTime(), t1 = new Date(series[series.length-1][0]).getTime();
+  const X = t => x0 + (new Date(t).getTime()-t0)/(t1-t0)*(x1-x0);
+  const Y = l => Hh-20 - (l/100)*(Hh-40);
+  let pts = series.filter(p=>p[1]!==null).map(p=>`${X(new Date(p[0]).getTime()).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" ");
+  const t1d = new Date(t1).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric"});
+  let s = `<svg viewBox="0 0 ${W} ${Hh}" width="100%">`;
+  s += `<rect x="0" y="${Y(80)}" width="${W}" height="${Y(60)-Y(80)}" fill="#e8f5e9"/>`;
+  s += `<text x="10" y="${Y(80)-4}" font-size="10" fill="#2e7d32">80% — 1,560 L</text>`;
+  s += `<text x="10" y="${Y(60)-4}" font-size="10" fill="#ef6c00">60% — 1,170 L (pump ON)</text>`;
+  s += `<polyline points="${pts}" fill="none" stroke="#0072ff" stroke-width="2"/>`;
+  s += `<text x="${W-10}" y="${Hh-4}" text-anchor="end" font-size="10" fill="#78909c">until ${t1d}</text>`;
+  return s + '</svg>';
+}
+
+function render(d){
+  const t = d.tank || {};
+  document.getElementById("gauge").innerHTML = arc(t.level||0, (t.level||0)>50?"#2ecc71":"#f39c12", Math.round(t.level||0)+"%", "of "+(t.capacity_l||1950)+" L");
+  document.getElementById("liters").textContent = (t.liters||0).toLocaleString() + " L";
+  const p = document.getElementById("pump");
+  p.textContent = t.pump === "ON" ? "PUMP ON" : "PUMP OFF";
+  p.className = "pill " + (t.pump === "ON" ? "on" : "off");
+  const stale = (d.updated_epoch||0) < Math.floor(Date.now()/1000) - 2400;
+  document.getElementById("age").textContent = ago(d.updated_epoch||0);
+  document.getElementById("status").innerHTML = stale
+    ? '<span class="dot stale"></span>STALE — PC logger not updating (' + esc(ago(d.updated_epoch||0)) + ' old data)'
+    : '<span class="dot"></span>live · updated ' + esc(ago(d.updated_epoch||0)) + ' · ' + esc(d.updated || "");
+
+  const hours = (d.today && d.today.hours) || Array(24).fill(null);
+  const hv = hours.filter(v=>v!==null);
+  document.getElementById("todaychart").innerHTML = hourlyBars(hours, Math.max(1,...hv,1));
+  document.getElementById("weekchart").innerHTML = dayBars(d.days || []);
+  document.getElementById("linechart").innerHTML = lineChart(d.series);
+  const s = d.summary || {};
+  document.getElementById("summary").innerHTML =
+    '<div class="grid">' +
+    '<div class="tile"><div class="v">'+(s.readings||0).toLocaleString()+'</div><div class="l">readings stored</div></div>' +
+    '<div class="tile"><div class="v">'+(s.cycles||0)+'</div><div class="l">pump cycles</div></div>' +
+    '<div class="tile"><div class="v">'+(s.coverage||0)+'%</div><div class="l">logging coverage</div></div>' +
+    '<div class="tile"><div class="v">'+(s.reboots||0)+'</div><div class="l">esp reboots</div></div></div>';
+}
+
+fetch("data.json?ts=" + Date.now()).then(r=>r.json()).then(render).catch(e=>{
+  document.getElementById("status").innerHTML = '<span class="dot stale"></span>connection problem — retrying…';
+});
+setInterval(()=>location.reload(), 120000);
+</script>
+</body>
+</html>
