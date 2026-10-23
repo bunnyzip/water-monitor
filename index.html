@@ -1001,7 +1001,7 @@
       const r0 = at(seg, wStart), r1 = at(seg, wEnd);
       if (!r0 || !r1) return;
       const drop = r0.pct - r1.pct;
-      if (drop < 0 || drop > 40) return;
+      if (drop < 0 || drop > 60) return;
       const rate = drop / (dur / 3600);
       let t = t0;
       while (t < wEnd) {
@@ -1022,11 +1022,13 @@
       for (let x = 1; x < fl.length; x++) collect(seg, fl[x - 1]._s1, fl[x]._s0);
       collect(seg, fl[fl.length - 1]._s1, s1);
     }
-    // assemble DAYS
+    // assemble DAYS — each day anchored to its real pump-delivered liters (capped scale for sparse days)
     DAYS = {}; DAY_KEYS = [];
     const dates = [...new Set(TELEMETRY.map(r => r.date))].sort();
     const rowsByDate = {};
     TELEMETRY.forEach(r => { (rowsByDate[r.date] = rowsByDate[r.date] || []).push(r); });
+    // pass 1: raw drain hours in liters
+    const rawDays = {};
     for (const d of dates) {
       const hours = Array(24).fill(null);
       for (let hh = 0; hh < 24; hh++) {
@@ -1036,8 +1038,23 @@
         else if (hasRows) hours[hh] = 0;
       }
       const cyc = CYCLES.filter(c => c.date === d);
-      DAYS[d] = { hours, total: hours.reduce((s, v) => s + (v || 0), 0),
+      rawDays[d] = { hours, rawL: hours.reduce((s, v) => s + (v || 0), 0),
         pumped_l: cyc.reduce((s, c) => s + c.gain_true_l, 0), cycles: cyc.length };
+    }
+    // global scale = liters of drain per liter of pumped, across all days (cap reference)
+    const gRaw = Object.values(rawDays).reduce((s, d) => s + d.rawL, 0);
+    const gDel = Object.values(rawDays).reduce((s, d) => s + d.pumped_l, 0);
+    const gScale = gRaw > 0 ? gDel / gRaw : 1;
+    for (const d of dates) {
+      const R = rawDays[d];
+      let k = 1;
+      if (R.pumped_l > 0 && R.rawL >= 50) {
+        k = R.pumped_l / R.rawL;                       // anchor day total to real deliveries
+        k = Math.min(k, gScale * 2.5);                 // cap: too-sparse days can't blow up
+      }
+      const hours = R.hours.map(v => v === null ? null : Math.round(v * k));
+      DAYS[d] = { hours, total: hours.reduce((s, v) => s + (v || 0), 0),
+        pumped_l: R.pumped_l, cycles: R.cycles };
       DAY_KEYS.push(d);
     }
     AVG_FULL = []; AVG_ORIG = [];
