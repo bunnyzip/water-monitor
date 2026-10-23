@@ -547,9 +547,9 @@
     <div class="card-head">
       <h3>📆 Daily Water Usage (Day-by-Day Hourly Breakdown)</h3>
     </div>
-    <div style="display:flex;gap:14px;align-items:center;justify-content:center;margin-bottom:10px;">
+    <div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:10px;">
       <button class="btn" onclick="shiftDay(-1)">&#9664;</button>
-      <span id="daytitle" style="font-size:17px;font-weight:800;color:#0d47a1;min-width:330px;text-align:center;"></span>
+      <span id="daytitle" style="font-size:16px;font-weight:800;color:#0d47a1;flex:1 1 auto;min-width:0;text-align:center;"></span>
       <button class="btn" onclick="shiftDay(1)">&#9654;</button>
     </div>
     <div class="svg-scroll">
@@ -591,10 +591,10 @@
       <h3>🕐 When the Pump Ran — AM &amp; PM Clocks</h3>
       <span class="pill info" id="clockspan"></span>
     </div>
-    <div style="display:flex;gap:14px;align-items:center;justify-content:center;margin-bottom:10px;">
-      <button class="btn" onclick="clockShift(-1)">&#9664;</button>
-      <span id="clocktitle" style="font-size:17px;font-weight:800;color:#0d47a1;min-width:330px;text-align:center;"></span>
-      <button class="btn" onclick="clockShift(1)">&#9654;</button>
+    <div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:10px;">
+      <button class="btn" id="clkprev" onclick="clockShift(-1)">&#9664;</button>
+      <span id="clocktitle" style="font-size:16px;font-weight:800;color:#0d47a1;flex:1 1 auto;min-width:0;text-align:center;"></span>
+      <button class="btn" id="clknext" onclick="clockShift(1)">&#9654;</button>
     </div>
     <div class="cap">Two 12-hour clock faces, like wall clocks: each slice is one hour of the day (top = 12 o&#39;clock, going clockwise). Shows the selected day&#39;s <strong>real</strong> pump-ON minutes.</div>
     <div id="clockwrap" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;"></div>
