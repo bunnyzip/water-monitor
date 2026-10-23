@@ -938,6 +938,20 @@
   }
 
   function buildDerived() {
+    // ---- segments (split at gaps > 30 min) + spike smoothing (PC-exact) ----
+    const segs = []; let curSeg = [TELEMETRY[0]];
+    for (let i = 1; i < TELEMETRY.length; i++) {
+      if (TELEMETRY[i]._e - TELEMETRY[i - 1]._e > 1800) { segs.push(curSeg); curSeg = [TELEMETRY[i]]; }
+      else curSeg.push(TELEMETRY[i]);
+    }
+    if (curSeg.length) segs.push(curSeg);
+    for (const seg of segs)
+      for (let k = 1; k < seg.length - 1; k++) {
+        const lv = seg[k].pct, la = seg[k - 1].pct, lb = seg[k + 1].pct;
+        if (lv > 0 && Math.abs(lv - la) > 5 && Math.abs(lv - lb) > 5)
+          seg[k].pct = Math.round((la + lb) / 2 * 10) / 10;
+      }
+
     // ---- pump cycles: continuous pump=ON runs ----
     CYCLES = [];
     let run = null;
@@ -966,7 +980,8 @@
           gain_on_pct: Math.round(gainOn * 10) / 10, gain_on_l: Math.round(gainOn * LPCT),
           gain_true_pct: Math.round(gainTrue * 10) / 10, gain_true_l: Math.round(gainTrue * LPCT),
           rate_l_min: Math.round(gainOn * LPCT / durExact * 10) / 10,
-          rate_pct_min: Math.round(gainOn / durExact * 100) / 100 });
+          rate_pct_min: Math.round(gainOn / durExact * 100) / 100,
+          dl: gainOn, abn: durExact < 5 || durExact > 40 || gainOn > 30 });
       }
       run = null;
     };
@@ -982,80 +997,90 @@
       }
     }
 
-    // ---- day-by-day drain hours (fill intervals = real cycles >=3% gain) ----
-    const segs = []; let cur = [TELEMETRY[0]];
-    for (let i = 1; i < TELEMETRY.length; i++) {
-      if (TELEMETRY[i]._e - TELEMETRY[i - 1]._e > 1800) { segs.push(cur); cur = [TELEMETRY[i]]; }
-      else cur.push(TELEMETRY[i]);
-    }
-    if (cur.length) segs.push(cur);
-    const realFills = CYCLES.filter(c => c.gain_true_pct >= 3);
+    // ---- hourly usage: EXACT port of make_report.py (the PC report engine) ----
+    // OFF stretches split at rises > 2 pts; settle skip 12 min; windows >= 0.3 h;
+    // 0 <= drop <= 40; distribute rate x time into BD date|hour buckets.
     const dayRaw = {};
-    const at = (seg, ts) => { let best = null;
-      for (const r of seg) { if (Math.abs(r._e - ts) <= 330) best = r; if (r._e > ts + 330) break; }
-      return best; };
-    const collect = (seg, wStart, wEnd) => {
-      if (wEnd - wStart < 1800) return;
-      const t0 = wStart + 720, dur = wEnd - t0;
-      if (dur < 1080) return;
-      const r0 = at(seg, wStart), r1 = at(seg, wEnd);
-      if (!r0 || !r1) return;
-      const drop = r0.pct - r1.pct;
-      if (drop < 0 || drop > 60) return;
-      const rate = drop / (dur / 3600);
-      let t = t0;
-      while (t < wEnd) {
-        const p = bd(t);
-        const hourStart = t - ((t + 21600) % 3600);
-        const nxt = hourStart + 3600;
-        const frac = (Math.min(nxt, wEnd) - t) / 3600;
-        const key = p.date + "|" + p.hour;
-        dayRaw[key] = (dayRaw[key] || 0) + rate * frac;
-        t = nxt;
-      }
-    };
     for (const seg of segs) {
-      const s0 = seg[0]._e, s1 = seg[seg.length - 1]._e;
-      const fl = realFills.filter(c => c._s0 >= s0 - 60 && c._s0 <= s1 + 60).sort((a, b) => a._s0 - b._s0);
-      if (!fl.length) { collect(seg, s0, s1); continue; }
-      collect(seg, s0, fl[0]._s0);
-      for (let x = 1; x < fl.length; x++) collect(seg, fl[x - 1]._s1, fl[x]._s0);
-      collect(seg, fl[fl.length - 1]._s1, s1);
+      let i = 0;
+      while (i < seg.length) {
+        if (seg[i].pump === "OFF" && seg[i].pct !== null && seg[i].pct !== undefined) {
+          let j = i;
+          while (j + 1 < seg.length && seg[j + 1].pump === "OFF") j++;
+          const bounds = [i];
+          for (let k = i + 1; k <= j; k++) {
+            const lp = seg[k - 1].pct, lc = seg[k].pct;
+            if (lp !== null && lc !== null && lc - lp > 2) bounds.push(k);
+          }
+          bounds.push(j + 1);
+          for (let x = 0; x < bounds.length - 1; x++) {
+            const a = bounds[x], b = bounds[x + 1];
+            const t1 = seg[b - 1];
+            let s0 = null;
+            for (let q = a; q < b; q++) { if (seg[q]._e >= seg[a]._e + 720) { s0 = seg[q]; break; } }
+            if (!s0 || s0.pct === null || s0 === t1) continue;
+            const durH = (t1._e - s0._e) / 3600;
+            if (durH >= 0.3) {
+              const drop = s0.pct - t1.pct;
+              if (drop >= 0 && drop <= 40) {
+                const rate = drop / durH;
+                let t = s0._e;
+                while (t < t1._e) {
+                  const p = bd(t);
+                  const hourStart = t - ((t + 21600) % 3600);
+                  const nxt = hourStart + 3600;
+                  const frac = (Math.min(nxt, t1._e) - t) / 3600;
+                  const key = p.date + "|" + p.hour;
+                  dayRaw[key] = (dayRaw[key] || 0) + rate * frac;
+                  t = nxt;
+                }
+              }
+            }
+          }
+          i = j + 1;
+        } else i++;
+      }
     }
-    // assemble DAYS — each day anchored to its real pump-delivered liters (capped scale for sparse days)
+    // delivered liters per day (non-abnormal cycles, like the PC engine)
+    const deliveredDay = {};
+    for (const c of CYCLES) if (!c.abn && c.dl > 0) deliveredDay[c.date] = (deliveredDay[c.date] || 0) + c.dl * LPCT;
+    const deliveredVals = Object.values(deliveredDay);
+    const avgDelivered = deliveredVals.length ? deliveredVals.reduce((s, v) => s + v, 0) / deliveredVals.length : 0;
+    LIVE_STATS.avgDelivered = avgDelivered;
+    // daily explorer: PC-exact assembly (per-day anchor to delivered, else global scale)
+    const daysRawSum = {};
+    for (const key in dayRaw) daysRawSum[key.split("|")[0]] = (daysRawSum[key.split("|")[0]] || 0) + dayRaw[key];
+    const gScale = Object.keys(daysRawSum).length ? avgDelivered / Object.values(daysRawSum).reduce((s, v) => s + v, 0) : 0;
     DAYS = {}; DAY_KEYS = [];
-    const dates = [...new Set(TELEMETRY.map(r => r.date))].sort();
+    const dates = [...new Set([...Object.keys(daysRawSum), ...TELEMETRY.map(r => r.date)])].sort();
     const rowsByDate = {};
     TELEMETRY.forEach(r => { (rowsByDate[r.date] = rowsByDate[r.date] || []).push(r); });
-    // pass 1: raw drain hours in liters
-    const rawDays = {};
     for (const d of dates) {
-      const hours = Array(24).fill(null);
-      for (let hh = 0; hh < 24; hh++) {
-        const hasRows = (rowsByDate[d] || []).some(r => r.hour === hh);
-        const v = dayRaw[d + "|" + hh];
-        if (v !== undefined) hours[hh] = Math.round(v * LPCT);
-        else if (hasRows) hours[hh] = 0;
-      }
-      const cyc = CYCLES.filter(c => c.date === d);
-      rawDays[d] = { hours, rawL: hours.reduce((s, v) => s + (v || 0), 0),
-        pumped_l: cyc.reduce((s, c) => s + c.gain_true_l, 0), cycles: cyc.length };
-    }
-    // global scale = liters of drain per liter of pumped, across all days (cap reference)
-    const gRaw = Object.values(rawDays).reduce((s, d) => s + d.rawL, 0);
-    const gDel = Object.values(rawDays).reduce((s, d) => s + d.pumped_l, 0);
-    const gScale = gRaw > 0 ? gDel / gRaw : 1;
-    for (const d of dates) {
-      const R = rawDays[d];
-      let k = 1;
-      if (R.pumped_l > 0 && R.rawL >= 50) {
-        k = R.pumped_l / R.rawL;                       // anchor day total to real deliveries
-        k = Math.min(k, gScale * 2.5);                 // cap: too-sparse days can't blow up
-      }
-      const hours = R.hours.map(v => v === null ? null : Math.round(v * k));
-      DAYS[d] = { hours, total: hours.reduce((s, v) => s + (v || 0), 0),
-        pumped_l: R.pumped_l, cycles: R.cycles };
+      const raws = {};
+      for (const key in dayRaw) { const parts = key.split("|"); if (parts[0] === d) raws[+parts[1]] = dayRaw[key]; }
+      const ssum = Object.values(raws).reduce((s, v) => s + v, 0);
+      const delivered = deliveredDay[d] || 0;
+      const scale = (ssum > 0 && delivered > 0) ? delivered / ssum : gScale;
+      const hours = [];
+      for (let hh = 0; hh < 24; hh++) hours.push(hh in raws ? Math.round(raws[hh] * scale) : null);
+      DAYS[d] = { hours, total: hours.reduce((s, v) => s + (v !== null ? v : 0), 0) };
       DAY_KEYS.push(d);
+    }
+    // average profile: mean across days per hour, anchored so the sum = avg delivered (PC-exact)
+    const hourL = {}, hourDays = {};
+    for (const key in dayRaw) {
+      const parts = key.split("|"), hh = +parts[1];
+      hourL[hh] = (hourL[hh] || 0) + dayRaw[key];
+      (hourDays[hh] = hourDays[hh] || new Set()).add(parts[0]);
+    }
+    let prof = Object.keys(hourL).map(h => [+h, hourL[h] / Object.keys(hourDays[h]).length]);
+    const rawSum = prof.reduce((s, p) => s + p[1], 0);
+    prof = prof.map(p => [p[0], rawSum ? p[1] / rawSum * avgDelivered : 0]);
+    AVG_FULL = []; AVG_ORIG = [];
+    for (let hh = 0; hh < 24; hh++) {
+      const f = prof.find(p => p[0] === hh);
+      AVG_FULL.push(f ? Math.round(f[1]) : null);
+      AVG_ORIG.push(f ? Math.round(f[1]) : null);
     }
     AVG_FULL = []; AVG_ORIG = [];
     for (let hh = 0; hh < 24; hh++) {
