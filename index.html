@@ -1064,9 +1064,13 @@
       }
     }
 
-    // ---- hourly usage: EXACT port of make_report.py (the PC report engine) ----
-    // OFF stretches split at rises > 2 pts; settle skip 12 min; windows >= 0.3 h;
-    // 0 <= drop <= 40; distribute rate x time into BD date|hour buckets.
+    // ---- hourly usage v3: two-category physical math ----
+    // 1) pump OFF stretch: usage = level drop x 20 L  (pure drain, measured)
+    // 2) pump ON fill ("combo"): taps keep running while the pump fills, so
+    //    usage = fillRate x minutes - net level rise x 20 L.
+    //    fillRate auto-calibrates per day from all fills BEFORE that day
+    //    (liters / minutes), so pump-pressure changes adapt automatically.
+    // No anchoring: the day total is what physically happened.
     const dayRaw = {};
     for (const seg of segs) {
       let i = 0;
@@ -1090,7 +1094,7 @@
             if (durH >= 0.3) {
               const drop = s0.pct - t1.pct;
               if (drop >= 0 && drop <= 40) {
-                const rate = drop / durH;
+                const rate = drop * LPCT / durH;          // liters per hour (raw, no anchor)
                 let t = s0._e;
                 while (t < t1._e) {
                   const p = bd(t);
@@ -1108,16 +1112,47 @@
         } else i++;
       }
     }
-    // delivered liters per day (non-abnormal cycles, like the PC engine)
+    // ---- combo usage during fills: rate x minutes - net rise ----
+    const fillRates = [];                                 // chronological {date, rate}
+    for (const c of CYCLES) {
+      if (!c.abn && c.dl > 0 && c.dur_exact >= 3) {
+        const r = c.dl * LPCT / c.dur_exact;
+        if (r >= 20 && r <= 45) fillRates.push({ date: c.date, rate: r });  // physical range for this pump
+      }
+    }
+    const dayRate = {};                                   // date -> L/min for that day
+    const allDates = [...new Set(TELEMETRY.map(r => r.date))].sort();
+    for (const d of allDates) {
+      const prior = fillRates.filter(f => f.date < d).map(f => f.rate).sort((x, y) => x - y);
+      dayRate[d] = prior.length ? prior[Math.floor(prior.length / 2)] : 31.8;   // median
+    }
+    for (const c of CYCLES) {
+      if (c.abn || c.dl <= 0) continue;
+      const rate = dayRate[c.date] || 31.8;
+      const combo = Math.max(0, rate * c.dur_exact - c.dl);   // used while filling
+      if (combo <= 0) continue;
+      const perMin = combo / c.dur_exact;
+      let t = c._s0;
+      while (t < c._s1) {
+        const p = bd(t);
+        const hourStart = t - ((t + 21600) % 3600);
+        const nxt = hourStart + 3600;
+        const frac = (Math.min(nxt, c._s1) - t) / 3600;
+        const key = p.date + "|" + p.hour;
+        dayRaw[key] = (dayRaw[key] || 0) + perMin * 60 * frac;
+        t = nxt;
+      }
+    }
+
+    // delivered liters per day (non-abnormal cycles)
     const deliveredDay = {};
     for (const c of CYCLES) if (!c.abn && c.dl > 0) deliveredDay[c.date] = (deliveredDay[c.date] || 0) + c.dl * LPCT;
     const deliveredVals = Object.values(deliveredDay);
     const avgDelivered = deliveredVals.length ? deliveredVals.reduce((s, v) => s + v, 0) / deliveredVals.length : 0;
     LIVE_STATS.avgDelivered = avgDelivered;
-    // daily explorer: PC-exact assembly (per-day anchor to delivered, else global scale)
+    // daily explorer assembly (raw measured liters - no anchor)
     const daysRawSum = {};
     for (const key in dayRaw) daysRawSum[key.split("|")[0]] = (daysRawSum[key.split("|")[0]] || 0) + dayRaw[key];
-    const gScale = Object.keys(daysRawSum).length ? avgDelivered / Object.values(daysRawSum).reduce((s, v) => s + v, 0) : 0;
     DAYS = {}; DAY_KEYS = [];
     const dates = [...new Set([...Object.keys(daysRawSum), ...TELEMETRY.map(r => r.date)])].sort();
     const rowsByDate = {};
@@ -1125,11 +1160,8 @@
     for (const d of dates) {
       const raws = {};
       for (const key in dayRaw) { const parts = key.split("|"); if (parts[0] === d) raws[+parts[1]] = dayRaw[key]; }
-      const ssum = Object.values(raws).reduce((s, v) => s + v, 0);
-      const delivered = deliveredDay[d] || 0;
-      const scale = (ssum > 0 && delivered > 0) ? delivered / ssum : gScale;
       const hours = [];
-      for (let hh = 0; hh < 24; hh++) hours.push(hh in raws ? Math.round(raws[hh] * scale) : null);
+      for (let hh = 0; hh < 24; hh++) hours.push(hh in raws ? Math.round(raws[hh]) : null);
       DAYS[d] = { hours, total: hours.reduce((s, v) => s + (v !== null ? v : 0), 0) };
       DAY_KEYS.push(d);
     }
