@@ -950,8 +950,9 @@
 <script>
   // ==== LIVE DATA LAYER — TELEMETRY/CYCLES/DAYS/AVG_* are rebuilt from Firebase on every load ====
   const FBURL = "https://tank-monitor-d9174-default-rtdb.asia-southeast1.firebasedatabase.app";
+  const BATT_FB = "https://battery-monitor-a1063-default-rtdb.asia-southeast1.firebasedatabase.app";
   const LPCT = 19.5;
-  let TELEMETRY = [], CYCLES = [], DAYS = {}, AVG_ORIG = [], AVG_FULL = [];
+  let TELEMETRY = [], CYCLES = [], DAYS = {}, AVG_ORIG = [], AVG_FULL = [], SHED = [];
   let LIVE_STATS = {};
   const BDMON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   function bd(epoch) {
@@ -967,10 +968,25 @@
   }
 
   async function loadLive() {
-    const [h, latest] = await Promise.all([
+    const [h, latest, bh] = await Promise.all([
       fetch(FBURL + "/tank_history.json?ts=" + Date.now()).then(r => r.json()),
-      fetch(FBURL + "/tank/latest.json?ts=" + Date.now()).then(r => r.json()).catch(() => null)
+      fetch(FBURL + "/tank/latest.json?ts=" + Date.now()).then(r => r.json()).catch(() => null),
+      fetch(BATT_FB + "/history/1.json?ts=" + Date.now()).then(r => r.json()).catch(() => null)
     ]);
+    // load-shedding windows from the battery ESP (negative current = mains down).
+    // +/-10 min padding: battery rows are 5-min samples, edges are fuzzy.
+    SHED = [];
+    if (bh) {
+      const pts = [];
+      for (const v of Object.values(bh)) if (v && v.ts !== undefined && v.a !== undefined) pts.push([v.ts, parseFloat(v.a)]);
+      pts.sort((x, y) => x[0] - y[0]);
+      let cur = null;
+      for (const [ts, a] of pts) {
+        if (a <= -0.5) { if (!cur) cur = [ts, ts]; else cur[1] = ts; }
+        else if (cur) { if (cur[1] - cur[0] > 300) SHED.push([cur[0] - 600, cur[1] + 600]); cur = null; }
+      }
+      if (cur && cur[1] - cur[0] > 300) SHED.push([cur[0] - 600, cur[1] + 600]);
+    }
     const raw = [];
     for (const k in (h || {})) {
       const r = h[k];
@@ -1075,6 +1091,7 @@
     const fillRates = [];                                 // chronological {date, rate}
     for (const c of CYCLES) {
       if (!c.abn && c.dl > 0 && c.dur_exact >= 3) {
+        if (SHED.some(w => c._s1 >= w[0] && c._s0 <= w[1])) continue;  // shedding-stalled fill: not a rate sample
         const r = c.dl * LPCT / c.dur_exact;
         if (r >= 20 && r <= 45) fillRates.push({ date: c.date, rate: r });
       }
@@ -1093,7 +1110,10 @@
         const dtMin = (b._e - a._e) / 60;
         if (dtMin <= 0 || dtMin > 20) continue;           // log gap: not measurable
         let liters;
-        if (a.pump === "ON" || b.pump === "ON") {
+        const shedNow = SHED.some(w => b._e >= w[0] && a._e <= w[1]);
+        if ((a.pump === "ON" || b.pump === "ON") && shedNow) {
+          liters = (a.pct - b.pct) * LPCT;          // mains down: pump cannot deliver, only drain
+        } else if (a.pump === "ON" || b.pump === "ON") {
           const rate = dayRate[a.date] || 31.8;
           const rise = (b.pct - a.pct) * LPCT;
           if (rise <= 0) {
