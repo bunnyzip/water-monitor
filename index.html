@@ -1064,83 +1064,58 @@
       }
     }
 
-    // ---- hourly usage v3: two-category physical math ----
-    // 1) pump OFF stretch: usage = level drop x 20 L  (pure drain, measured)
-    // 2) pump ON fill ("combo"): taps keep running while the pump fills, so
-    //    usage = fillRate x minutes - net level rise x 20 L.
-    //    fillRate auto-calibrates per day from all fills BEFORE that day
-    //    (liters / minutes), so pump-pressure changes adapt automatically.
-    // No anchoring: the day total is what physically happened.
-    const dayRaw = {};
-    for (const seg of segs) {
-      let i = 0;
-      while (i < seg.length) {
-        if (seg[i].pump === "OFF" && seg[i].pct !== null && seg[i].pct !== undefined) {
-          let j = i;
-          while (j + 1 < seg.length && seg[j + 1].pump === "OFF") j++;
-          const bounds = [i];
-          for (let k = i + 1; k <= j; k++) {
-            const lp = seg[k - 1].pct, lc = seg[k].pct;
-            if (lp !== null && lc !== null && lc - lp > 2) bounds.push(k);
-          }
-          bounds.push(j + 1);
-          for (let x = 0; x < bounds.length - 1; x++) {
-            const a = bounds[x], b = bounds[x + 1];
-            const t1 = seg[b - 1];
-            let s0 = null;
-            for (let q = a; q < b; q++) { if (seg[q]._e >= seg[a]._e + 720) { s0 = seg[q]; break; } }
-            if (!s0 || s0.pct === null || s0 === t1) continue;
-            const durH = (t1._e - s0._e) / 3600;
-            if (durH >= 0.3) {
-              const drop = s0.pct - t1.pct;
-              if (drop >= 0 && drop <= 40) {
-                const rate = drop * LPCT / durH;          // liters per hour (raw, no anchor)
-                let t = s0._e;
-                while (t < t1._e) {
-                  const p = bd(t);
-                  const hourStart = t - ((t + 21600) % 3600);
-                  const nxt = hourStart + 3600;
-                  const frac = (Math.min(nxt, t1._e) - t) / 3600;
-                  const key = p.date + "|" + p.hour;
-                  dayRaw[key] = (dayRaw[key] || 0) + rate * frac;
-                  t = nxt;
-                }
-              }
-            }
-          }
-          i = j + 1;
-        } else i++;
-      }
-    }
-    // ---- combo usage during fills: rate x minutes - net rise ----
+    // ---- hourly usage v4: per-interval measurement, zero spreading ----
+    // every data interval is measured on its own and dropped into its own hour:
+    //   pump OFF minute:  usage = level drop x 20 L            (pure drain)
+    //   pump ON  minute:  usage = fillRate x min - level rise x 20 L
+    //                       (taps keep drawing while the pump fills)
+    // fillRate auto-calibrates per day from fills BEFORE that day
+    // (median of liters/minutes, physical range 20-45 L/min).
+    // Signed values sum cleanly, so sensor noise cancels by accumulation.
     const fillRates = [];                                 // chronological {date, rate}
     for (const c of CYCLES) {
       if (!c.abn && c.dl > 0 && c.dur_exact >= 3) {
         const r = c.dl * LPCT / c.dur_exact;
-        if (r >= 20 && r <= 45) fillRates.push({ date: c.date, rate: r });  // physical range for this pump
+        if (r >= 20 && r <= 45) fillRates.push({ date: c.date, rate: r });
       }
     }
     const dayRate = {};                                   // date -> L/min for that day
     const allDates = [...new Set(TELEMETRY.map(r => r.date))].sort();
     for (const d of allDates) {
       const prior = fillRates.filter(f => f.date < d).map(f => f.rate).sort((x, y) => x - y);
-      dayRate[d] = prior.length ? prior[Math.floor(prior.length / 2)] : 31.8;   // median
+      dayRate[d] = prior.length ? prior[Math.floor(prior.length / 2)] : 31.8;
     }
-    for (const c of CYCLES) {
-      if (c.abn || c.dl <= 0) continue;
-      const rate = dayRate[c.date] || 31.8;
-      const combo = Math.max(0, rate * c.dur_exact - c.dl);   // used while filling
-      if (combo <= 0) continue;
-      const perMin = combo / c.dur_exact;
-      let t = c._s0;
-      while (t < c._s1) {
-        const p = bd(t);
-        const hourStart = t - ((t + 21600) % 3600);
-        const nxt = hourStart + 3600;
-        const frac = (Math.min(nxt, c._s1) - t) / 3600;
-        const key = p.date + "|" + p.hour;
-        dayRaw[key] = (dayRaw[key] || 0) + perMin * 60 * frac;
-        t = nxt;
+    const dayRaw = {};
+    for (const seg of segs) {
+      for (let k = 1; k < seg.length; k++) {
+        const a = seg[k - 1], b = seg[k];
+        if (a.pct === null || a.pct === undefined || b.pct === null || b.pct === undefined) continue;
+        const dtMin = (b._e - a._e) / 60;
+        if (dtMin <= 0 || dtMin > 20) continue;           // log gap: not measurable
+        let liters;
+        if (a.pump === "ON" || b.pump === "ON") {
+          const rate = dayRate[a.date] || 31.8;
+          const rise = (b.pct - a.pct) * LPCT;
+          if (rise <= 0) {
+            liters = -rise;          // level not rising while "ON": pump not actually
+                                     // delivering (power cut / stall) - count only drain
+          } else {
+            liters = Math.max(0, rate * dtMin - rise);    // pumping: inflow minus rise
+          }
+        } else {
+          liters = (a.pct - b.pct) * LPCT;                // pure drain
+        }
+        // bucket into the hour(s) this interval spans, proportionally
+        let t = a._e;
+        while (t < b._e - 0.001) {
+          const p = bd(t);
+          const hourStart = t - ((t + 21600) % 3600);
+          const nxt = hourStart + 3600;
+          const spanMin = Math.min(nxt, b._e) - t;
+          const key = p.date + "|" + p.hour;
+          dayRaw[key] = (dayRaw[key] || 0) + liters * (spanMin / 60) / dtMin;
+          t = nxt;
+        }
       }
     }
 
