@@ -1103,48 +1103,66 @@
       dayRate[d] = prior.length ? prior[Math.floor(prior.length / 2)] : 31.8;
     }
     const dayRaw = {};
+    const bucket = (liters, t0, t1) => {              // spread liters across the hour(s) spanned
+      let tt = t0;
+      while (tt < t1 - 0.001) {
+        const p = bd(tt);
+        const nxt = tt - ((tt + 21600) % 3600) + 3600;
+        const spanMin = Math.min(nxt, t1) - tt;
+        const key = p.date + "|" + p.hour;
+        dayRaw[key] = (dayRaw[key] || 0) + liters * (spanMin / 60) / ((t1 - tt) / 60);
+        tt = nxt;
+      }
+    };
     for (const seg of segs) {
-      for (let k = 1; k < seg.length; k++) {
+      let k = 1;
+      while (k < seg.length) {
         const a = seg[k - 1], b = seg[k];
-        if (a.pct === null || a.pct === undefined || b.pct === null || b.pct === undefined) continue;
         const dtMin = (b._e - a._e) / 60;
-        if (dtMin <= 0 || dtMin > 20) continue;           // log gap: not measurable
-        // above 100% = manual overfill / sensor overshoot: the tank cannot HOLD it,
-        // so cap at 100. Rises past 100 count 0 usage, settle-back counts 0 usage.
-        const la = Math.min(a.pct, 100), lb = Math.min(b.pct, 100);
-        let liters;
+        if (a.pct == null || b.pct == null || dtMin <= 0 || dtMin > 20) { k++; continue; }
+        const la = Math.min(a.pct, 100), lb = Math.min(b.pct, 100);   // >100% = overflow, not data
+        const rate = dayRate[a.date] || 31.8;
         const shedNow = SHED.some(w => b._e >= w[0] && a._e <= w[1]);
-        const rise = (lb - la) * LPCT;                     // liters gained this interval
-        const extPump = (!shedNow && (a.pump === "OFF" && b.pump === "OFF") &&
-                         rise > 10 * dtMin);               // relay OFF but level climbing:
-                                                           // an external/manual pump is running
-        if ((a.pump === "ON" || b.pump === "ON") && shedNow) {
-          liters = (la - lb) * LPCT;                // mains down: pump cannot deliver, only drain
-        } else if (extPump) {
-          // external/manual pump: same calibrated rate, same combo math as auto fills
-          const rate = dayRate[a.date] || 31.8;
-          liters = Math.max(0, rate * dtMin - rise);
-        } else if (a.pump === "ON" || b.pump === "ON") {
-          if (rise <= 0) {
-            liters = -rise;          // level not rising while "ON": pump not actually
-                                     // delivering (power cut / stall) - count only drain
+
+        if (a.pump === "ON" || b.pump === "ON") {     // relay ON interval: measured alone
+          let liters;
+          if (shedNow) {
+            liters = (la - lb) * LPCT;                // mains down: pump cannot deliver
           } else {
-            liters = Math.max(0, rate * dtMin - rise);    // pumping: inflow minus rise
+            const rise = (lb - la) * LPCT;
+            liters = rise <= 0 ? -rise                // no rise while "ON": stalled (power cut)
+                                : Math.max(0, rate * dtMin - rise);   // combo taps-during-fill
           }
+          bucket(liters, a._e, b._e);
+          k++;
+          continue;
+        }
+
+        // ---- pump OFF stretch: group consecutive OFF intervals, measure as a whole ----
+        let j = k;
+        while (j + 1 < seg.length && seg[j].pump === "OFF" && seg[j + 1].pump === "OFF" &&
+               seg[j].pct != null && seg[j + 1].pct != null &&
+               (seg[j + 1]._e - seg[j]._e) / 60 <= 20) j++;
+        const s0 = seg[k - 1]._e, t1 = seg[j]._e;
+        const durMin = (t1 - s0) / 60;
+        let net = 0;
+        const perMin = [];
+        for (let q = k; q <= j; q++) {
+          const p0 = seg[q - 1], p1 = seg[q];
+          const d = (Math.min(p0.pct, 100) - Math.min(p1.pct, 100)) * LPCT;
+          perMin.push([p0._e, p1._e, d]);
+          net += d;
+        }
+        if (net >= 0) {
+          // normal drain: every interval's signed drop counts (noise cancels)
+          for (const [t0, t2, d] of perMin) bucket(d, t0, t2);
         } else {
-          liters = (la - lb) * LPCT;                      // pure drain
+          // NET RISE while pump OFF = an external/manual pump ran here.
+          // combo: calibrated inflow minus what the tank actually kept.
+          const combo = Math.max(0, rate * durMin - (-net));
+          if (combo > 0) bucket(combo, s0, t1);
         }
-        // bucket into the hour(s) this interval spans, proportionally
-        let t = a._e;
-        while (t < b._e - 0.001) {
-          const p = bd(t);
-          const hourStart = t - ((t + 21600) % 3600);
-          const nxt = hourStart + 3600;
-          const spanMin = Math.min(nxt, b._e) - t;
-          const key = p.date + "|" + p.hour;
-          dayRaw[key] = (dayRaw[key] || 0) + liters * (spanMin / 60) / dtMin;
-          t = nxt;
-        }
+        k = j + 1;
       }
     }
 
