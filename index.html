@@ -509,6 +509,69 @@
     </div>
   </div>
 
+  <!-- 1b. REMOTE CONTROL (account-gated) -->
+  <div id="sec-control" class="card">
+    <div class="card-head">
+      <h3>🎛️ Remote Pump Control — Owner Only</h3>
+      <span class="pill info" id="ctlState">checking device…</span>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      <input type="password" id="ctlPass" placeholder="Owner password" autocomplete="current-password"
+             style="padding:10px 14px;border-radius:10px;border:2px solid var(--border,#ccc);font-size:15px;font-weight:700;min-width:170px;" />
+      <button class="btn" onclick="ctlSend('mode_auto')"  style="background:#2e7d32;">AUTO</button>
+      <button class="btn" onclick="ctlSend('pump_on')"   style="background:#1565c0;">PUMP ON</button>
+      <button class="btn" onclick="ctlSend('pump_off')"  style="background:#e53935;">PUMP OFF</button>
+      <button class="btn btn-outline" onclick="ctlSend('refresh')">REFRESH NOW</button>
+    </div>
+    <div class="sub" style="margin-top:8px;">Commands are signed with your password (SHA-256 challenge) — the password never leaves this device. Device checks the signature and obeys within seconds.</div>
+    <div id="ctlMsg" style="margin-top:6px;font-weight:800;"></div>
+  </div>
+
+  <script>
+  const FBCTL = "https://battery-monitor-a1063-default-rtdb.asia-southeast1.firebasedatabase.app";
+  const FB_CMD = FBCTL + '/tank_cmd.json';
+  async function sha256hex(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  async function ctlNonce() {
+    const r = await fetch(FBCTL + '/tank/latest.json');
+    const j = await r.json();
+    return (j && j.nonce) ? j.nonce : null;
+  }
+  async function ctlSend(cmd) {
+    const msgEl = document.getElementById('ctlMsg');
+    const pass = document.getElementById('ctlPass').value;
+    if (!pass) { msgEl.style.color = '#e53935'; msgEl.textContent = '❌ Enter the owner password first.'; return; }
+    msgEl.style.color = '#555'; msgEl.textContent = '⏳ signing…';
+    const nonce = await ctlNonce();
+    if (!nonce) { msgEl.style.color = '#e53935'; msgEl.textContent = '❌ No nonce from device — is the tank ESP online?'; return; }
+    const resp = await sha256hex(nonce + pass);
+    try {
+      const r = await fetch(FB_CMD, { method: 'PUT', body: JSON.stringify({ cmd: cmd, resp: resp, ts: Date.now() }) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      localStorage.setItem('tankpass', 'set');
+      msgEl.style.color = '#2e7d32';
+      msgEl.textContent = '✅ "' + cmd + '" sent — device verifies and acts within ~10 s. Watch the status above.';
+    } catch (e) {
+      msgEl.style.color = '#e53935';
+      msgEl.textContent = '❌ Send failed: ' + e.message + ' (needs the tank_cmd write rule in Firebase)';
+    }
+  }
+  (async function ctlWatch() {
+    try {
+      const r = await fetch(FBCTL + '/tank/latest.json');
+      const j = await r.json();
+      const online = j && j.src === 'tank' && j.nonce;
+      document.getElementById('ctlState').textContent = online
+        ? '🟢 device online, remote control armed' : '🟡 legacy firmware — control activates after v7 flash';
+    } catch (e) {
+      document.getElementById('ctlState').textContent = '🔴 Firebase unreachable';
+    }
+    setTimeout(ctlWatch, 60000);
+  })();
+  </script>
+
   <!-- 2. KEY NUMBERS -->
   <div class="card">
     <div class="card-head">
