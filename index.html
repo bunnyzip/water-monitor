@@ -735,7 +735,7 @@
         </select>
         <label style="font-size:12.5px;color:#0d47a1;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
           <input type="checkbox" id="filterGlitchChk" checked onchange="renderTimelineChart()" />
-          Hide 4 Zero-Pct Sensor Glitches (0.0%)
+          Hide sensor glitches (0% drops + sawtooth faults)
         </label>
       </div>
     </div>
@@ -1614,7 +1614,7 @@
       const cap = document.getElementById("rawStatusCap");
       if (cap) cap.textContent = "Showing all " + n.toLocaleString() + " records (newest first).";
       const capEl = document.querySelector("#sec-timeline .cap");
-      if (capEl) capEl.innerHTML = "Interactive time-series of all " + n.toLocaleString() + " Firebase readings (live). Green dots mark <strong>Pump ON</strong> samples; flagged triangles mark 0.0% sensor dropouts and ≥85% overfill levels.";
+      if (capEl) capEl.innerHTML = "Interactive time-series of all " + n.toLocaleString() + " Firebase readings (live). Green dots mark <strong>Pump ON</strong> samples; flagged triangles mark sensor faults: 0.0% dropouts, sawtooth oscillation, and true overfill (≥100%).";
       document.querySelectorAll('.nav-pill').forEach(b => {
         if (b.textContent.includes("Pump Cycles")) b.textContent = "🔄 All " + CYCLES.length + " Pump Cycles";
         if (b.textContent.includes("Raw Log")) b.textContent = "🔍 Raw Log (" + n.toLocaleString() + ")";
@@ -1732,20 +1732,52 @@
 
   // 4. Interactive Chart.js Timeline
   let timelineChart = null;
+  // sensor-fault sawtooth detector: alternating swings >= 78 L (4%) = faulty sensor.
+  // returns a Set of reading _e stamps that belong to a corrupt run.
+  let sawCache = { n: -1, set: new Set() };
+  function sawtoothSet() {
+    if (sawCache.n === TELEMETRY.length) return sawCache.set;
+    const set = new Set();
+    let runStart = null, prevSign = 0, flips = 0, stable = 0, prevT = null, prevPct = null;
+    for (const r of TELEMETRY) {
+      if (prevT !== null && (r._e - prevT) > 120) {                    // gap: close run
+        if (flips >= 3) for (let e = runStart; e <= prevT; e += 60) set.add(e);
+        runStart = null; prevSign = 0; flips = 0; stable = 0;
+      }
+      if (prevPct !== null && prevT !== null && r._e > prevT) {
+        const d = (prevPct - r.pct) * LPCT;                            // +drain / -rise
+        const big = Math.abs(d) >= 78;
+        const sgn = d > 0 ? 1 : -1;
+        if (runStart === null) runStart = prevT;
+        if (big && prevSign !== 0 && sgn !== prevSign) flips++;
+        if (big) prevSign = sgn;
+        if (!big) { stable++; if (stable >= 8 && flips < 3) {          // settled: clean run
+          if (flips >= 3) for (let e = runStart; e <= prevT; e += 60) set.add(e);
+          runStart = r._e; prevSign = 0; flips = 0; stable = 0;
+        } }
+      }
+      prevT = r._e; prevPct = r.pct;
+    }
+    if (flips >= 3 && runStart !== null) for (let e = runStart; e <= prevT; e += 60) set.add(e);
+    sawCache = { n: TELEMETRY.length, set: set };
+    return set;
+  }
+
   function renderTimelineChart() {
     const dateFilter = document.getElementById('timelineDateSelect').value;
     const hideGlitch = document.getElementById('filterGlitchChk').checked;
 
+    const saw = sawtoothSet();
     const data = TELEMETRY.filter(r => {
       if (dateFilter !== 'ALL' && r.date !== dateFilter) return false;
-      if (hideGlitch && r.pct === 0) return false;
+      if (hideGlitch && (r.pct === 0 || saw.has(r._e))) return false;
       return true;
     });
 
     const labels = data.map(r => r.ts.slice(5, 16));
     const pctSeries = data.map(r => r.pct);
     const onSeries = data.map(r => r.pump === 'ON' ? r.pct : null);
-    const anomSeries = data.map(r => (r.pct === 0 || (r.pct > 85 && r.pump === 'OFF')) ? r.pct : null);
+    const anomSeries = data.map(r => (r.pct === 0 || r.pct > 99.5 || saw.has(r._e)) ? r.pct : null);
 
     const ctx = document.getElementById('telemetryCanvas').getContext('2d');
     if (timelineChart) timelineChart.destroy();
@@ -1774,7 +1806,7 @@
             showLine: false
           },
           {
-            label: 'Anomaly (100% Bypass / 0% Glitch)',
+            label: 'Anomaly (overfill / glitch / sensor sawtooth)',
             data: anomSeries,
             borderColor: '#d32f2f',
             backgroundColor: '#d32f2f',
