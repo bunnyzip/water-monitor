@@ -1114,11 +1114,17 @@
         const la = Math.min(a.pct, 100), lb = Math.min(b.pct, 100);
         let liters;
         const shedNow = SHED.some(w => b._e >= w[0] && a._e <= w[1]);
+        const rise = (lb - la) * LPCT;                     // liters gained this interval
+        const extPump = (!shedNow && (a.pump === "OFF" && b.pump === "OFF") &&
+                         rise > 10 * dtMin);               // relay OFF but level climbing:
+                                                           // an external/manual pump is running
         if ((a.pump === "ON" || b.pump === "ON") && shedNow) {
           liters = (la - lb) * LPCT;                // mains down: pump cannot deliver, only drain
-        } else if (a.pump === "ON" || b.pump === "ON") {
+        } else if (extPump) {
+          // external/manual pump: same calibrated rate, same combo math as auto fills
           const rate = dayRate[a.date] || 31.8;
-          const rise = (lb - la) * LPCT;
+          liters = Math.max(0, rate * dtMin - rise);
+        } else if (a.pump === "ON" || b.pump === "ON") {
           if (rise <= 0) {
             liters = -rise;          // level not rising while "ON": pump not actually
                                      // delivering (power cut / stall) - count only drain
