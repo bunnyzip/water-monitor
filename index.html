@@ -1266,29 +1266,63 @@
           perMin.push([p0._e, p1._e, d]);
           net += d;
         }
-        // base: signed per-interval accounting (telescoping exact within the stretch)
-        for (let q = k; q <= j; q++) {
-          const p0 = seg[q - 1], p1 = seg[q];
-          bucket((Math.min(p0.pct, 100) - Math.min(p1.pct, 100)) * LPCT, p0._e, p1._e);
-        }
-        // external/manual pump detection: level climbs >= 100 L inside a <= 75-min window
+        // detect external/manual pump windows in this stretch:
+        // level climbs >= 100 L inside a <= 75-min window while the relay is OFF
         const lv = [], tm = [];
         for (let q = k - 1; q <= j; q++) { lv.push(Math.min(seg[q].pct, 100)); tm.push(seg[q]._e); }
-        let best = 0, bs = -1, be = -1;
-        for (let e = 1; e < lv.length; e++) {
-          for (let s = e - 1; s >= 0; s--) {
-            if ((tm[e] - tm[s]) / 60 > 75) break;
-            const r = (lv[e] - lv[s]) * LPCT;
-            if (r > best) { best = r; bs = s; be = e; }
+        const win = [];
+        {
+          const work = lv.slice();
+          const used = [];                                   // [startIdx, endIdx] taken windows
+          for (let pass = 0; pass < 6; pass++) {
+            let best = 0, bs = -1, be = -1;
+            for (let e = 1; e < work.length; e++) {
+              for (let s = e - 1; s >= 0; s--) {
+                if ((tm[e] - tm[s]) / 60 > 75) break;
+                const r = (work[e] - work[s]) * LPCT;
+                if (r <= best) continue;
+                let overlaps = false;
+                for (const u of used) if (!(e < u[0] || s > u[1])) { overlaps = true; break; }
+                if (overlaps) continue;
+                best = r; bs = s; be = e;
+              }
+            }
+            if (best < 100) break;
+            win.push([tm[bs], tm[be]]);
+            used.push([bs, be]);
+            for (let f = bs; f <= be; f++) work[f] = work[be];   // flatten found window, search again
           }
         }
-        if (best >= 100) {
-          const durW = (tm[be] - tm[bs]) / 60;
-          manualRuns.push({ s0: tm[bs], t1: tm[be] });
-          const combo = Math.max(0, (dayRate[a.date] || 31.8) * durW - best);
-          if (combo > 0) {
-            manualComboDay[bd(tm[bs]).date] = (manualComboDay[bd(tm[bs]).date] || 0) + combo;
-            bucket(combo, tm[bs], tm[be]);
+        // base accounting: stored rise inside a fill window (ESP cycle or manual) is
+        // INFLOW, not negative usage - skipped. Drains everywhere always count.
+        for (let q = k; q <= j; q++) {
+          const p0 = seg[q - 1], p1 = seg[q];
+          const d = (Math.min(p0.pct, 100) - Math.min(p1.pct, 100)) * LPCT;
+          const t0 = p0._e, t1 = p1._e;
+          if (d < 0) {
+            const inFill = CYCLES.some(c => !c.abn && t1 > c._s0 && t0 < c._s1) ||
+                           win.some(w => t1 > w[0] && t0 < w[1]);
+            if (inFill) continue;                     // inflow: handled by the window combo
+          }
+          bucket(d, t0, t1);
+        }
+        // combo per manual window: inflow - what the tank kept
+        { // recompute stored rise per window from lv/tm
+          for (const w of win) {
+            manualRuns.push({ s0: w[0], t1: w[1] });
+            let si = -1, ei = -1;
+            for (let q = 0; q < tm.length; q++) {
+              if (tm[q] === w[0]) si = q;
+              if (tm[q] === w[1]) ei = q;
+            }
+            if (si < 0 || ei < 0 || ei <= si) continue;
+            const stored = (lv[ei] - lv[si]) * LPCT;
+            const durW = (w[1] - w[0]) / 60;
+            const combo = Math.max(0, (dayRate[a.date] || 31.8) * durW - stored);
+            if (combo > 0) {
+              manualComboDay[bd(w[0]).date] = (manualComboDay[bd(w[0]).date] || 0) + combo;
+              bucket(combo, w[0], w[1]);
+            }
           }
         }
         k = j + 1;
