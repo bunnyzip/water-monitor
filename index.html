@@ -528,7 +528,7 @@
   </div>
 
   <script>
-  const FBCTL = "https://battery-monitor-a1063-default-rtdb.asia-southeast1.firebasedatabase.app";
+  const FBCTL = "https://tank-monitor-d9174-default-rtdb.asia-southeast1.firebasedatabase.app";
   const FB_CMD = FBCTL + '/tank_cmd.json';
   async function sha256hex(str) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -949,7 +949,7 @@
 
 <script>
   // ==== LIVE DATA LAYER — TELEMETRY/CYCLES/DAYS/AVG_* are rebuilt from Firebase on every load ====
-  const FBURL = "https://battery-monitor-a1063-default-rtdb.asia-southeast1.firebasedatabase.app";
+  const FBURL = "https://tank-monitor-d9174-default-rtdb.asia-southeast1.firebasedatabase.app";
   const LPCT = 19.5;
   let TELEMETRY = [], CYCLES = [], DAYS = {}, AVG_ORIG = [], AVG_FULL = [];
   let LIVE_STATS = {};
