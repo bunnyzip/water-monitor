@@ -423,7 +423,7 @@
     </div>
     <div class="hero-badges">
       <div class="h-badge">Mode: <b>100% AUTO</b></div>
-      <div class="h-badge">Trigger Band: <b>~60% &rarr; ~81%</b></div>
+      <div class="h-badge" id="triggerBand">Trigger Band: <b>~60% &rarr; ~80%</b></div>
       <div class="h-badge">Total Cycles: <b>16 ON (+2 Offline)</b></div>
     </div>
   </div>
@@ -453,16 +453,16 @@
       <!-- Visual Tank Cylinder -->
       <div class="tank-visual-box">
         <div class="tank-cylinder">
-          <div class="tank-line-80" title="Auto Cutoff (~81.2% / 1,583 L)"></div>
-          <div class="tank-line-60" title="Auto Trigger (~60.0% / 1,170 L)"></div>
+          <div class="tank-line-80" id="tankCutLine" title="Auto Cutoff"></div>
+          <div class="tank-line-60" id="tankTrigLine" title="Auto Trigger"></div>
           <div class="tank-water" style="height: 69.2%;"></div>
           <div class="tank-overlay-text">
             <span style="font-size:22px;">69.2%</span>
             <span style="font-size:12px;">1,349 L</span>
           </div>
         </div>
-        <div style="font-size:11px;color:#1565c0;font-weight:700;margin-top:6px;text-align:center;">
-          Cutoff: 81% (1,580 L)<br/>Trigger: 60% (1,170 L)
+        <div id="tankCfgCaption" style="font-size:11px;color:#1565c0;font-weight:700;margin-top:6px;text-align:center;">
+          Cutoff: 80% (1,560 L)<br/>Trigger: 60% (1,170 L)
         </div>
       </div>
 
@@ -482,7 +482,7 @@
           <div class="lbox">
             <div class="big">179 L</div>
             <div class="lab">Buffer Above Trigger</div>
-            <div class="sub"><strong>+9.2%</strong> above 60.0% (1,170 L)</div>
+            <div class="sub" id="bufferSub"><strong>+9.2%</strong> above 60.0% (1,170 L)</div>
           </div>
           <div class="lbox">
             <div class="big">86 L/h</div>
@@ -572,6 +572,24 @@
       msgEl.textContent = '❌ Send failed: ' + e.message + ' (needs the tank_cmd write rule in Firebase)';
     }
   }
+  function updateTankVisual() {
+    const trig = Math.round(CFG.trig || 60), cut = Math.round(CFG.cut || 80);
+    const L = p => Math.round(p * LPCT).toLocaleString();
+    const lc = document.getElementById('tankCutLine');
+    const lt = document.getElementById('tankTrigLine');
+    if (lc) { lc.style.bottom = cut + '%'; lc.title = 'Auto Cutoff (' + cut + '% / ' + L(cut) + ' L)'; }
+    if (lt) { lt.style.bottom = trig + '%'; lt.title = 'Auto Trigger (' + trig + '% / ' + L(trig) + ' L)'; }
+    const cap = document.getElementById('tankCfgCaption');
+    if (cap) cap.innerHTML = 'Cutoff: ' + cut + '% (' + L(cut) + ' L)<br/>Trigger: ' + trig + '% (' + L(trig) + ' L)';
+    const band = document.getElementById('triggerBand');
+    if (band) band.innerHTML = 'Trigger Band: <b>~' + trig + '% &rarr; ~' + cut + '%</b>';
+    if (TELEMETRY && TELEMETRY.length) {
+      const pct = TELEMETRY[TELEMETRY.length - 1].pct;
+      const buf = Math.max(0, pct - trig);
+      const bs = document.getElementById('bufferSub');
+      if (bs) bs.innerHTML = '<strong>+' + buf.toFixed(1) + '%</strong> above ' + trig + '.0% (' + L(trig) + ' L)';
+    }
+  }
   async function cfgLoad() {
     try {
       const j = await (await fetch(FBCTL + '/tank_cfg.json')).json();
@@ -606,6 +624,9 @@
       if (!r.ok) throw new Error('HTTP ' + r.status);
       msg.style.color = '#2e7d32';
       msg.textContent = '✅ settings sent — device verifies and applies';
+      CFG.trig = isFinite(trig) ? trig : CFG.trig; CFG.cut = isFinite(cut) ? cut : CFG.cut;
+      CFG.kw = isFinite(kw) ? kw : CFG.kw; CFG.rate = isFinite(rate) ? rate : CFG.rate;
+      updateTankVisual();
     } catch (e) { msg.style.color = '#e53935'; msg.textContent = '❌ ' + e.message; }
   }
   function manualStatus() {
@@ -1057,7 +1078,10 @@
     if (cfg && typeof cfg === "object") {
       if (isFinite(cfg.kw)) CFG.kw = cfg.kw;
       if (isFinite(cfg.rate)) CFG.rate = cfg.rate;
+      if (isFinite(cfg.trig)) CFG.trig = cfg.trig;
+      if (isFinite(cfg.cut)) CFG.cut = cfg.cut;
     }
+    updateTankVisual();
     // load-shedding windows from the battery ESP (negative current = mains down).
     // +/-10 min padding: battery rows are 5-min samples, edges are fuzzy.
     SHED = [];
