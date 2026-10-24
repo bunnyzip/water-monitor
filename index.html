@@ -1109,13 +1109,16 @@
         if (a.pct === null || a.pct === undefined || b.pct === null || b.pct === undefined) continue;
         const dtMin = (b._e - a._e) / 60;
         if (dtMin <= 0 || dtMin > 20) continue;           // log gap: not measurable
+        // above 100% = manual overfill / sensor overshoot: the tank cannot HOLD it,
+        // so cap at 100. Rises past 100 count 0 usage, settle-back counts 0 usage.
+        const la = Math.min(a.pct, 100), lb = Math.min(b.pct, 100);
         let liters;
         const shedNow = SHED.some(w => b._e >= w[0] && a._e <= w[1]);
         if ((a.pump === "ON" || b.pump === "ON") && shedNow) {
-          liters = (a.pct - b.pct) * LPCT;          // mains down: pump cannot deliver, only drain
+          liters = (la - lb) * LPCT;                // mains down: pump cannot deliver, only drain
         } else if (a.pump === "ON" || b.pump === "ON") {
           const rate = dayRate[a.date] || 31.8;
-          const rise = (b.pct - a.pct) * LPCT;
+          const rise = (lb - la) * LPCT;
           if (rise <= 0) {
             liters = -rise;          // level not rising while "ON": pump not actually
                                      // delivering (power cut / stall) - count only drain
@@ -1123,7 +1126,7 @@
             liters = Math.max(0, rate * dtMin - rise);    // pumping: inflow minus rise
           }
         } else {
-          liters = (a.pct - b.pct) * LPCT;                // pure drain
+          liters = (la - lb) * LPCT;                      // pure drain
         }
         // bucket into the hour(s) this interval spans, proportionally
         let t = a._e;
@@ -1156,7 +1159,7 @@
       const raws = {};
       for (const key in dayRaw) { const parts = key.split("|"); if (parts[0] === d) raws[+parts[1]] = dayRaw[key]; }
       const hours = [];
-      for (let hh = 0; hh < 24; hh++) hours.push(hh in raws ? Math.round(raws[hh]) : null);
+      for (let hh = 0; hh < 24; hh++) hours.push(hh in raws ? Math.max(0, Math.round(raws[hh])) : null);
       DAYS[d] = { hours, total: hours.reduce((s, v) => s + (v !== null ? v : 0), 0) };
       DAY_KEYS.push(d);
     }
