@@ -758,7 +758,7 @@
       <span id="clocktitle" style="font-size:16px;font-weight:800;color:#0d47a1;flex:1 1 auto;min-width:0;text-align:center;"></span>
       <button class="btn" id="clknext" onclick="clockShift(1)">&#9654;</button>
     </div>
-    <div class="cap">Two 12-hour clock faces, like wall clocks: each slice is one hour of the day (top = 12 o&#39;clock, going clockwise). Shows the selected day&#39;s <strong>real</strong> pump-ON minutes.</div>
+    <div class="cap">Two 12-hour clock faces, like wall clocks: each slice is one hour of the day (top = 12 o&#39;clock, going clockwise). Shows the selected day&#39;s <strong>real</strong> pump-ON minutes. <span style='color:#6a1b9a;font-weight:700;'>Purple = manual pump (no relay).</span></div>
     <div id="clockwrap" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;"></div>
   </div>
 
@@ -1054,6 +1054,7 @@
   let TELEMETRY = [], CYCLES = [], DAYS = {}, AVG_ORIG = [], AVG_FULL = [], SHED = [];
   let CFG = { kw: 2.0, rate: 10 };
   let dayRateCache = {};
+  let manualRuns = [];   // {s0, t1} epoch windows where a manual/external pump ran
   let LIVE_STATS = {};
   const BDMON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   function bd(epoch) {
@@ -1198,6 +1199,7 @@
     // (median of liters/minutes, physical range 20-45 L/min).
     // Signed values sum cleanly, so sensor noise cancels by accumulation.
     const espComboDay = {}, manualComboDay = {};      // liters used while the pump filled (ESP vs manual)
+    manualRuns = [];
     const fillRates = [];                                 // chronological {date, rate}
     for (const c of CYCLES) {
       if (!c.abn && c.dl > 0 && c.dur_exact >= 3) {
@@ -1264,19 +1266,29 @@
           perMin.push([p0._e, p1._e, d]);
           net += d;
         }
-        if (net >= -150 || durMin > 120) {
-          // normal drain (signed sum, noise cancels). Long net-rise stretches span hours of
-          // mixed usage - not a single external fill - so they stay signed and floor at 0.
-          for (const [t0, t2, d] of perMin) bucket(d, t0, t2);
-        } else {
-          // NET RISE >= 150 L within <= 2 h while pump OFF = external/manual pump ran.
-          // combo: calibrated inflow minus what the tank actually kept.
-          const combo = Math.max(0, rate * durMin - (-net));
+        // base: signed per-interval accounting (telescoping exact within the stretch)
+        for (let q = k; q <= j; q++) {
+          const p0 = seg[q - 1], p1 = seg[q];
+          bucket((Math.min(p0.pct, 100) - Math.min(p1.pct, 100)) * LPCT, p0._e, p1._e);
+        }
+        // external/manual pump detection: level climbs >= 100 L inside a <= 75-min window
+        const lv = [], tm = [];
+        for (let q = k - 1; q <= j; q++) { lv.push(Math.min(seg[q].pct, 100)); tm.push(seg[q]._e); }
+        let best = 0, bs = -1, be = -1;
+        for (let e = 1; e < lv.length; e++) {
+          for (let s = e - 1; s >= 0; s--) {
+            if ((tm[e] - tm[s]) / 60 > 75) break;
+            const r = (lv[e] - lv[s]) * LPCT;
+            if (r > best) { best = r; bs = s; be = e; }
+          }
+        }
+        if (best >= 100) {
+          const durW = (tm[be] - tm[bs]) / 60;
+          manualRuns.push({ s0: tm[bs], t1: tm[be] });
+          const combo = Math.max(0, (dayRate[a.date] || 31.8) * durW - best);
           if (combo > 0) {
-            manualComboDay[bd(s0).date] = (manualComboDay[bd(s0).date] || 0) + combo;
-            bucket(combo, s0, t1);
-          } else {
-            for (const [t0, t2, d] of perMin) bucket(d, t0, t2);
+            manualComboDay[bd(tm[bs]).date] = (manualComboDay[bd(tm[bs]).date] || 0) + combo;
+            bucket(combo, tm[bs], tm[be]);
           }
         }
         k = j + 1;
@@ -1818,11 +1830,28 @@
       let mins = 1;
       if (nxt && nxt.date === r.date) mins = Math.min(120, (nxt._e - r._e) / 60);
       const d = perDayClock[r.date] = perDayClock[r.date] ||
-        { am: new Array(12).fill(0), pm: new Array(12).fill(0) };
+        { am: new Array(12).fill(0), pm: new Array(12).fill(0),
+          mam: new Array(12).fill(0), mpm: new Array(12).fill(0) };
       d[r.hour < 12 ? "am" : "pm"][r.hour < 12 ? r.hour : r.hour - 12] += Math.min(mins, 60);
     });
+    // manual pump minutes: detected external-pump run windows (relay OFF, level rising)
+    manualRuns.forEach(run => {
+      let t = run.s0;
+      while (t < run.t1 - 0.001) {
+        const p = bd(t);
+        const nxtHour = t - ((t + 21600) % 3600) + 3600;
+        const mins = Math.min(nxtHour, run.t1) - t;
+        const d = perDayClock[p.date] = perDayClock[p.date] ||
+          { am: new Array(12).fill(0), pm: new Array(12).fill(0),
+            mam: new Array(12).fill(0), mpm: new Array(12).fill(0) };
+        const slot = p.hour < 12 ? "mam" : "mpm";
+        d[slot][p.hour < 12 ? p.hour : p.hour - 12] += mins / 60;
+        t = nxtHour;
+      }
+    });
     DAY_KEYS.forEach(d => {
-      if (!perDayClock[d]) perDayClock[d] = { am: new Array(12).fill(0), pm: new Array(12).fill(0) };
+      if (!perDayClock[d]) perDayClock[d] = { am: new Array(12).fill(0), pm: new Array(12).fill(0),
+        mam: new Array(12).fill(0), mpm: new Array(12).fill(0) };
     });
   }
   function clockShift(delta) {
@@ -1845,10 +1874,21 @@
     for (let p = 0; p < 12; p++) {
       s += '<path d="' + clockArcPath(CX, CY, R0, R1, p * 30 + 1, (p + 1) * 30 - 1) + '" fill="#eceff1"/>';
     }
-    vals.forEach((mins, p) => {
+    const manVals = (arguments.length > 4 ? arguments[4] : null) || new Array(12).fill(0);
+    let manTot = 0;
+    manVals.forEach(m => manTot += m);
+    manVals.forEach((mins, p) => {
       if (mins <= 0.05) return;
       const span = Math.min(30, mins / 60 * 30);
-      s += '<path d="' + clockArcPath(CX, CY, R0, R1, p * 30 + 1, p * 30 + 1 + span) + '" fill="#2e7d32" stroke="none"><title>' +
+      s += '<path d="' + clockArcPath(CX, CY, R0, R1, p * 30 + 1, p * 30 + 1 + span) + '" fill="#6a1b9a" stroke="none"><title>' +
+        (p === 0 ? 12 : p) + " " + (half === "am" ? "AM" : "PM") + ": " + Math.round(mins) + " min MANUAL pump</title></path>";
+    });
+    vals.forEach((mins, p) => {
+      if (mins <= 0.05) return;
+      const mOff = Math.min(30, manVals[p] / 60 * 30);
+      const span = Math.max(0, Math.min(30 - mOff, mins / 60 * 30));
+      if (span <= 0) return;
+      s += '<path d="' + clockArcPath(CX, CY, R0, R1, p * 30 + 1 + mOff, p * 30 + 1 + mOff + span) + '" fill="#2e7d32" stroke="none"><title>' +
         (p === 0 ? 12 : p) + " " + (half === "am" ? "AM" : "PM") + ": " + Math.round(mins) + " min ON</title></path>";
     });
     for (let p = 0; p < 12; p++) {
@@ -1856,10 +1896,11 @@
       const lx = (CX + 152 * Math.cos(rad)).toFixed(1), ly = (CY + 152 * Math.sin(rad)).toFixed(1);
       s += '<text x="' + lx + '" y="' + ly + '" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="700" fill="#546e7a">' + (p === 0 ? 12 : p) + "</text>";
     }
-    const tot = Math.round(vals.reduce((x, y) => x + y, 0));
+    const tot = Math.round(vals.reduce((x, y) => x + y, 0) + manTot);
     s += '<circle cx="' + CX + '" cy="' + CY + '" r="58" fill="#ffffff"/>';
     s += '<text x="' + CX + '" y="' + (CY - 6) + '" text-anchor="middle" font-size="24" font-weight="900" fill="#1b5e20">' + tot + 'm</text>';
-    s += '<text x="' + CX + '" y="' + (CY + 16) + '" text-anchor="middle" font-size="11" fill="#78909c">pump ON</text>';
+    s += '<text x="' + CX + '" y="' + (CY + 16) + '" text-anchor="middle" font-size="11" fill="#78909c">pump ON' +
+         (manTot > 0.5 ? ' (' + Math.round(manTot) + 'm manual)' : '') + '</text>';
     s += '<text x="' + CX + '" y="' + (CY + 36) + '" text-anchor="middle" font-size="12" font-weight="800" fill="#0d47a1">' + (half === "am" ? "AM (12 AM – 11 AM)" : "PM (12 PM – 11 PM)") + "</text>";
     s += '<text x="' + CX + '" y="' + (CY + 54) + '" text-anchor="middle" font-size="10.5" fill="#78909c">' + esc2(dateStr) + "</text>";
     s += "</svg>";
@@ -1871,16 +1912,20 @@
     pumpClockData();
     curClockIdx = Math.min(curClockIdx, DAY_KEYS.length - 1);
     const d = DAY_KEYS[curClockIdx];
-    const dc = perDayClock[d] || { am: new Array(12).fill(0), pm: new Array(12).fill(0) };
+    const dc = perDayClock[d] || { am: new Array(12).fill(0), pm: new Array(12).fill(0),
+      mam: new Array(12).fill(0), mpm: new Array(12).fill(0) };
     const ds = new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" });
-    const tot = Math.round(dc.am.reduce((x, y) => x + y, 0) + dc.pm.reduce((x, y) => x + y, 0));
+    const tot = Math.round(dc.am.reduce((x, y) => x + y, 0) + dc.pm.reduce((x, y) => x + y, 0) +
+                           dc.mam.reduce((x, y) => x + y, 0) + dc.mpm.reduce((x, y) => x + y, 0));
+    const manTot = Math.round(dc.mam.reduce((x, y) => x + y, 0) + dc.mpm.reduce((x, y) => x + y, 0));
     const titleEl = document.getElementById("clocktitle");
-    if (titleEl) titleEl.innerHTML = ds + " &nbsp;•&nbsp; <span style=\"color:#d84315;\">" + tot + " min pump ON</span>";
+    if (titleEl) titleEl.innerHTML = ds + " &nbsp;•&nbsp; <span style=\"color:#d84315;\">" + tot + " min pump ON</span>" +
+      (manTot > 0 ? " &nbsp;•&nbsp; <span style=\"color:#6a1b9a;\">" + manTot + " min manual</span>" : "");
     const pill = document.getElementById("clockspan");
     if (pill) pill.textContent = "Real values • day " + (curClockIdx + 1) + " of " + DAY_KEYS.length + " • ◀ ▶ to change day";
     el.innerHTML = '<div style="text-align:center;" id="clkam"></div><div style="text-align:center;" id="clkpm"></div>';
-    drawPumpClock("clkam", dc.am, "am", ds);
-    drawPumpClock("clkpm", dc.pm, "pm", ds);
+    drawPumpClock("clkam", dc.am, "am", ds, dc.mam);
+    drawPumpClock("clkpm", dc.pm, "pm", ds, dc.mpm);
   }
 
   // Initialize Everything
