@@ -1011,7 +1011,7 @@
     for (const seg of segs)
       for (let k = 1; k < seg.length - 1; k++) {
         const lv = seg[k].pct, la = seg[k - 1].pct, lb = seg[k + 1].pct;
-        if (lv > 0 && Math.abs(lv - la) > 5 && Math.abs(lv - lb) > 5)
+        if (lv !== null && Math.abs(lv - la) > 5 && Math.abs(lv - lb) > 5)
           seg[k].pct = Math.round((la + lb) / 2 * 10) / 10;
       }
 
