@@ -1030,9 +1030,13 @@
       for (let j = i0; j < Math.min(TELEMETRY.length, i1 + 15); j++) peak = Math.max(peak, TELEMETRY[j].pct);
       const trigger = i0 > 0 ? TELEMETRY[i0 - 1].pct : first.pct;
       const durExact = r ? Math.max(0.1, (r._e - first._e) / 60) : Math.max(0.1, (last._e - first._e) / 60 + 1);
-      if (run.rows.length >= 2 && durExact >= 3) {
+      if (durExact >= 3) {
         const dts = run.rows.slice(1).map(x => x.dt_sec).filter(x => x > 0);
         const gainOn = Math.max(0, cutoff - first.pct), gainTrue = Math.max(0, peak - trough);
+        // truth: the pump delivered the whole trough->peak rise (sparse ON samples
+        // otherwise miss the rise before the first ON row). PC engine's gainOn is a
+        // lower bound at 5-min sampling; trough->peak is the physically real volume.
+        const dlUse = Math.max(gainOn, gainTrue);
         const p0 = bd(first._e);
         CYCLES.push({ no: CYCLES.length + 1, date: p0.date, _s0: first._e, _s1: endR2(r, last),
           start_fmt: p0.fmt, end_fmt: r ? bd(r._e).clock : p0.clock,
@@ -1042,9 +1046,9 @@
           cutoff_pct: Math.round(cutoff * 10) / 10, trough_pct: trough, peak_pct: peak,
           gain_on_pct: Math.round(gainOn * 10) / 10, gain_on_l: Math.round(gainOn * LPCT),
           gain_true_pct: Math.round(gainTrue * 10) / 10, gain_true_l: Math.round(gainTrue * LPCT),
-          rate_l_min: Math.round(gainOn * LPCT / durExact * 10) / 10,
-          rate_pct_min: Math.round(gainOn / durExact * 100) / 100,
-          dl: gainOn, abn: durExact < 5 || durExact > 40 || gainOn > 30 });
+          rate_l_min: Math.round(dlUse * LPCT / durExact * 10) / 10,
+          rate_pct_min: Math.round(dlUse / durExact * 100) / 100,
+          dl: dlUse, abn: durExact < 5 || durExact > 40 || dlUse > 32 });
       }
       run = null;
     };
