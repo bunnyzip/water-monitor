@@ -1055,6 +1055,7 @@
   let CFG = { kw: 2.0, rate: 10 };
   let dayRateCache = {};
   let manualRuns = [];   // {s0, t1} epoch windows where a manual/external pump ran
+  let logBadStretch = false;
   let LIVE_STATS = {};
   const BDMON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   function bd(epoch) {
@@ -1265,6 +1266,25 @@
           const d = (Math.min(p0.pct, 100) - Math.min(p1.pct, 100)) * LPCT;
           perMin.push([p0._e, p1._e, d]);
           net += d;
+        }
+        // SANITY GATE - sensor-fault sawtooth: water cannot jump up/down 80+ L every
+        // minute. Alternating swings that big = faulty sensor (condensation etc.).
+        // Mark corrupt: show NO DATA, no combo, no manual detection for this stretch.
+        let flips = 0, prevSign = 0, lastSwingT = 0;
+        for (const [t0, t2, d] of perMin) {
+          if (Math.abs(d) < 80) continue;
+          const sgn = d > 0 ? 1 : -1;
+          if (prevSign !== 0 && sgn !== prevSign) flips++;
+          prevSign = sgn;
+          lastSwingT = t2;
+        }
+        if (flips >= 3) {
+          // corrupt from the first big swing onward: keep only the clean leading part
+          let cutIdx = perMin.findIndex(x => Math.abs(x[2]) >= 80);
+          for (let i = 0; i < cutIdx; i++) bucket(perMin[i][0], perMin[i][1], perMin[i][2]);
+          manualRuns = manualRuns.filter(r => r.t1 < s0 || r.s0 > t1);   // drop false windows
+          k = j + 1;
+          continue;
         }
         // detect external/manual pump windows in this stretch:
         // level climbs >= 100 L inside a <= 75-min window while the relay is OFF
