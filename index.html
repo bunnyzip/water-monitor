@@ -514,7 +514,21 @@
     <div class="card-head">
       <h3>🎛️ Remote Pump Control — Owner Only</h3>
       <span class="pill info" id="ctlState">checking device…</span>
+      <span class="pill" id="shedBanner" style="display:none;background:#ff6d00;color:#fff;">⚡ LOAD SHEDDING — pump held off</span>
+      <span class="pill" id="manualPill" style="display:none;background:#6a1b9a;color:#fff;">Manual pump: checking…</span>
     </div>
+    <div id="adminBox" style="display:none;margin-top:10px;padding:10px;border:1px dashed #999;border-radius:10px;">
+      <div style="font-weight:800;margin-bottom:6px;">⚙️ Admin settings (password-protected)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <label>Pump ON level % <input id="cfgTrig" type="number" min="30" max="55" style="width:70px;"></label>
+        <label>Pump OFF level % <input id="cfgCut" type="number" min="60" max="95" style="width:70px;"></label>
+        <label>Pump kW <input id="cfgKw" type="number" step="0.1" min="0.3" max="7" style="width:70px;"></label>
+        <label>৳/kWh <input id="cfgRate" type="number" step="0.5" min="1" max="30" style="width:70px;"></label>
+        <button class="btn" onclick="cfgApply()" style="background:#2e7d32;">APPLY</button>
+        <span id="cfgMsg" style="font-weight:800;"></span>
+      </div>
+    </div>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="toggleAdmin(this)">⚙️ Admin settings</button>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
       <input type="password" id="ctlPass" placeholder="Owner password" autocomplete="current-password"
              style="padding:10px 14px;border-radius:10px;border:2px solid var(--border,#ccc);font-size:15px;font-weight:700;min-width:170px;" />
@@ -558,6 +572,55 @@
       msgEl.textContent = '❌ Send failed: ' + e.message + ' (needs the tank_cmd write rule in Firebase)';
     }
   }
+  async function cfgLoad() {
+    try {
+      const j = await (await fetch(FBCTL + '/tank_cfg.json')).json();
+      if (j) {
+        CFG.kw = isFinite(j.kw) ? j.kw : CFG.kw;
+        CFG.rate = isFinite(j.rate) ? j.rate : CFG.rate;
+        if (isFinite(j.trig)) document.getElementById('cfgTrig').value = j.trig;
+        if (isFinite(j.cut)) document.getElementById('cfgCut').value = j.cut;
+        document.getElementById('cfgKw').value = CFG.kw;
+        document.getElementById('cfgRate').value = CFG.rate;
+      }
+    } catch (e) {}
+  }
+  function toggleAdmin(btn) {
+    const box = document.getElementById('adminBox');
+    const show = box.style.display === 'none';
+    box.style.display = show ? 'block' : 'none';
+    if (show) cfgLoad();
+  }
+  async function cfgApply() {
+    const msg = document.getElementById('cfgMsg');
+    const pass = document.getElementById('ctlPass').value;
+    if (!pass) { msg.style.color = '#e53935'; msg.textContent = '❌ password first'; return; }
+    const trig = parseInt(document.getElementById('cfgTrig').value), cut = parseInt(document.getElementById('cfgCut').value);
+    const kw = parseFloat(document.getElementById('cfgKw').value), rate = parseFloat(document.getElementById('cfgRate').value);
+    msg.style.color = '#555'; msg.textContent = '⏳ signing…';
+    const nonce = await ctlNonce();
+    if (!nonce) { msg.style.color = '#e53935'; msg.textContent = '❌ device offline'; return; }
+    const resp = await sha256hex(nonce + pass);
+    try {
+      const r = await fetch(FB_CMD, { method: 'PUT', body: JSON.stringify({ cmd: 'setcfg', trig: trig, cut: cut, kw: kw, rate: rate, resp: resp, ts: Date.now() }) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      msg.style.color = '#2e7d32';
+      msg.textContent = '✅ settings sent — device verifies and applies';
+    } catch (e) { msg.style.color = '#e53935'; msg.textContent = '❌ ' + e.message; }
+  }
+  function manualStatus() {
+    if (!TELEMETRY || TELEMETRY.length < 6) return null;
+    const tail = TELEMETRY.slice(-6);
+    if (tail.some(r => r.pump === 'ON')) return null;                  // ESP pump active - not manual
+    const net = tail[tail.length-1].pct - tail[0].pct;
+    const mins = (tail[tail.length-1]._e - tail[0]._e) / 60;
+    if (mins <= 0) return null;
+    if (net >= 2 && net / mins > 0.4) return 'ON';                     // rising steadily: manual pump running
+    if (manualWasOn && net <= 1) { manualWasOn = false; return 'OFF'; }
+    if (net >= 2) { manualWasOn = true; return 'ON'; }
+    return manualWasOn ? 'ON?' : null;
+  }
+  let manualWasOn = false;
   (async function ctlWatch() {
     try {
       const r = await fetch(FBCTL + '/tank/latest.json');
@@ -565,6 +628,21 @@
       const online = j && j.src === 'tank' && j.nonce;
       document.getElementById('ctlState').textContent = online
         ? '🟢 device online, remote control armed' : '🟡 legacy firmware — control activates after v7 flash';
+      if (j && j.shed === true) { document.getElementById('shedBanner').style.display = 'inline-block'; }
+      else { document.getElementById('shedBanner').style.display = 'none'; }
+      if (j && j.shed === true) {
+        document.getElementById('manualPill').style.display = 'inline-block';
+        document.getElementById('manualPill').textContent = 'Manual pump: OFF (no power)';
+      } else {
+        const m = manualStatus();
+        if (m) {
+          manualWasOn = (m === 'ON');
+          document.getElementById('manualPill').style.display = 'inline-block';
+          document.getElementById('manualPill').textContent = 'Manual pump: ' + m;
+        } else if (!manualWasOn) {
+          document.getElementById('manualPill').style.display = 'none';
+        }
+      }
     } catch (e) {
       document.getElementById('ctlState').textContent = '🔴 Firebase unreachable';
     }
@@ -953,6 +1031,8 @@
   const BATT_FB = "https://battery-monitor-a1063-default-rtdb.asia-southeast1.firebasedatabase.app";
   const LPCT = 19.5;
   let TELEMETRY = [], CYCLES = [], DAYS = {}, AVG_ORIG = [], AVG_FULL = [], SHED = [];
+  let CFG = { kw: 2.0, rate: 10 };
+  let dayRateCache = {};
   let LIVE_STATS = {};
   const BDMON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   function bd(epoch) {
@@ -968,11 +1048,16 @@
   }
 
   async function loadLive() {
-    const [h, latest, bh] = await Promise.all([
+    const [h, latest, bh, cfg] = await Promise.all([
       fetch(FBURL + "/tank_history.json?ts=" + Date.now()).then(r => r.json()),
       fetch(FBURL + "/tank/latest.json?ts=" + Date.now()).then(r => r.json()).catch(() => null),
-      fetch(BATT_FB + "/history/1.json?ts=" + Date.now()).then(r => r.json()).catch(() => null)
+      fetch(BATT_FB + "/history/1.json?ts=" + Date.now()).then(r => r.json()).catch(() => null),
+      fetch(FBURL + "/tank_cfg.json?ts=" + Date.now()).then(r => r.json()).catch(() => null)
     ]);
+    if (cfg && typeof cfg === "object") {
+      if (isFinite(cfg.kw)) CFG.kw = cfg.kw;
+      if (isFinite(cfg.rate)) CFG.rate = cfg.rate;
+    }
     // load-shedding windows from the battery ESP (negative current = mains down).
     // +/-10 min padding: battery rows are 5-min samples, edges are fuzzy.
     SHED = [];
@@ -1064,7 +1149,7 @@
           gain_true_pct: Math.round(gainTrue * 10) / 10, gain_true_l: Math.round(gainTrue * LPCT),
           rate_l_min: Math.round(dlUse * LPCT / durExact * 10) / 10,
           rate_pct_min: Math.round(dlUse / durExact * 100) / 100,
-          dl: dlUse, abn: durExact < 5 || durExact > 40 || dlUse > 32 });
+          dl: dlUse, abn: durExact < 5 || durExact > 40 || dlUse > 46 });
       }
       run = null;
     };
@@ -1088,6 +1173,7 @@
     // fillRate auto-calibrates per day from fills BEFORE that day
     // (median of liters/minutes, physical range 20-45 L/min).
     // Signed values sum cleanly, so sensor noise cancels by accumulation.
+    const espComboDay = {}, manualComboDay = {};      // liters used while the pump filled (ESP vs manual)
     const fillRates = [];                                 // chronological {date, rate}
     for (const c of CYCLES) {
       if (!c.abn && c.dl > 0 && c.dur_exact >= 3) {
@@ -1102,6 +1188,7 @@
       const prior = fillRates.filter(f => f.date < d).map(f => f.rate).sort((x, y) => x - y);
       dayRate[d] = prior.length ? prior[Math.floor(prior.length / 2)] : 31.8;
     }
+    dayRateCache = dayRate;
     const dayRaw = {};
     const bucket = (liters, t0, t1) => {              // spread liters across the hour(s) spanned
       let tt = t0;
@@ -1130,10 +1217,10 @@
             liters = (la - lb) * LPCT;                // mains down: pump cannot deliver
           } else {
             const rise = (lb - la) * LPCT;
-            liters = rise <= 0 ? -rise                // no rise while "ON": stalled (power cut)
-                                : Math.max(0, rate * dtMin - rise);   // combo taps-during-fill
-          }
-          bucket(liters, a._e, b._e);
+            liters = rise <= 0 ? -rise                // stalled (power cut): only drain
+                                : 0;                  // pumping minutes: combo is computed
+          }                                             // once per FILL below (no clamp bias)
+          if (liters > 0) bucket(liters, a._e, b._e);
           k++;
           continue;
         }
@@ -1153,16 +1240,33 @@
           perMin.push([p0._e, p1._e, d]);
           net += d;
         }
-        if (net >= 0) {
-          // normal drain: every interval's signed drop counts (noise cancels)
+        if (net >= -150 || durMin > 120) {
+          // normal drain (signed sum, noise cancels). Long net-rise stretches span hours of
+          // mixed usage - not a single external fill - so they stay signed and floor at 0.
           for (const [t0, t2, d] of perMin) bucket(d, t0, t2);
         } else {
-          // NET RISE while pump OFF = an external/manual pump ran here.
+          // NET RISE >= 150 L within <= 2 h while pump OFF = external/manual pump ran.
           // combo: calibrated inflow minus what the tank actually kept.
           const combo = Math.max(0, rate * durMin - (-net));
-          if (combo > 0) bucket(combo, s0, t1);
+          if (combo > 0) {
+            manualComboDay[bd(s0).date] = (manualComboDay[bd(s0).date] || 0) + combo;
+            bucket(combo, s0, t1);
+          } else {
+            for (const [t0, t2, d] of perMin) bucket(d, t0, t2);
+          }
         }
         k = j + 1;
+      }
+    }
+
+    // combo usage per FILL: inflow (rate x minutes) - net stored rise (dl% x LPCT)
+    for (const c of CYCLES) {
+      if (c.abn || c.dl <= 0) continue;
+      if (SHED.some(w => c._s1 >= w[0] && c._s0 <= w[1])) continue;   // shed-stalled fill: drain already counted
+      const combo = Math.max(0, (dayRate[c.date] || 31.8) * c.dur_exact - c.dl * LPCT);
+      if (combo > 0) {
+        espComboDay[c.date] = (espComboDay[c.date] || 0) + combo;
+        bucket(combo, c._s0, c._s1);
       }
     }
 
@@ -1184,7 +1288,8 @@
       for (const key in dayRaw) { const parts = key.split("|"); if (parts[0] === d) raws[+parts[1]] = dayRaw[key]; }
       const hours = [];
       for (let hh = 0; hh < 24; hh++) hours.push(hh in raws ? Math.max(0, Math.round(raws[hh])) : null);
-      DAYS[d] = { hours, total: hours.reduce((s, v) => s + (v !== null ? v : 0), 0) };
+      DAYS[d] = { hours, total: hours.reduce((s, v) => s + (v !== null ? v : 0), 0),
+                  espCombo: Math.round(espComboDay[d] || 0), manualCombo: Math.round(manualComboDay[d] || 0) };
       DAY_KEYS.push(d);
     }
     // average profile: mean across days per hour, anchored so the sum = avg delivered (PC-exact)
@@ -1491,7 +1596,14 @@
     drawBarSvg('daysvg', d.hours);
     const dtObj = new Date(k + "T00:00:00");
     const ds = dtObj.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" });
-    document.getElementById("daytitle").innerHTML = `${ds} &nbsp;•&nbsp; <span style="color:#d84315;">${d.total.toLocaleString()} L total</span>`;
+    const kW = CFG.kw || 2.0, tariff = CFG.rate || 10;
+    const lPerKwh = (dayRateCache[d] || 28.5) * 60 / kW;         // liters pumped per kWh
+    const kwh = d.total / lPerKwh, cost = kwh * tariff;
+    let comboTxt = "";
+    if (d.manualCombo > 0) comboTxt = ` &nbsp;•&nbsp; <span style="color:#6a1b9a;">manual pump: ${d.manualCombo.toLocaleString()} L</span>`;
+    if (d.espCombo > 0) comboTxt += ` &nbsp;•&nbsp; <span style="color:#2e7d32;">fill-time use: ${d.espCombo.toLocaleString()} L</span>`;
+    document.getElementById("daytitle").innerHTML = `${ds} &nbsp;•&nbsp; <span style="color:#d84315;">${d.total.toLocaleString()} L total</span>`
+      + ` &nbsp;•&nbsp; <span style="color:#37474f;">⚡ ${kwh.toFixed(1)} kWh ≈ ৳${Math.round(cost)}</span>` + comboTxt;
   }
 
   // 3. Render Pump Cycles Table
