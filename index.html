@@ -1055,6 +1055,7 @@
   let CFG = { kw: 2.0, rate: 10 };
   let dayRateCache = {};
   let manualRuns = [];   // {s0, t1} epoch windows where a manual/external pump ran
+  let SENSOR_FAULT_UNTIL = 0;   // last epoch until which the sensor data is corrupt (page-side v7.6)
   let logBadStretch = false;
   let LIVE_STATS = {};
   const BDMON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -1283,6 +1284,7 @@
           let cutIdx = perMin.findIndex(x => Math.abs(x[2]) >= 80);
           for (let i = 0; i < cutIdx; i++) bucket(perMin[i][0], perMin[i][1], perMin[i][2]);
           manualRuns = manualRuns.filter(r => r.t1 < s0 || r.s0 > t1);   // drop false windows
+          if (t1 > SENSOR_FAULT_UNTIL) SENSOR_FAULT_UNTIL = t1;          // page-side fault window
           k = j + 1;
           continue;
         }
@@ -1438,12 +1440,46 @@
     LIVE_STATS = { n, dropouts, onRows, gaps, gapSec, covPct, spanTxt, regimeByDate, overfill, dates, rowsByDate };
   }
 
-  function updateStatic() {
+  async function sendStop() {
+    try {
+      const lat = await (await fetch(FBURL + "/tank/latest.json")).json();
+      const nonce = lat.nonce || "";
+      const pass = (window.ADMIN_PASS || prompt("Admin password to sign the STOP command:"));
+      if (!pass) return;
+      window.ADMIN_PASS = pass;
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(nonce + pass));
+      const resp = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+      await fetch(FBURL + "/tank_cmd.json", { method: "PUT", body: JSON.stringify({ cmd: "pump_off", resp: resp, ts: Date.now() }) });
+      const bar = document.getElementById("sfGuard");
+      if (bar) bar.innerHTML = "&#9989; STOP command signed and sent (pump_off). Verify the pump state below.";
+    } catch (e) { alert("STOP failed: " + e.message); }
+  }
+
+function updateStatic() {
     const n = TELEMETRY.length;
     if (!n) return;
     const last = TELEMETRY[n - 1];
     const pct = last.pct, lit = Math.round(pct * LPCT);
     const guard = (fn) => { try { fn(); } catch (e) { console.warn("updateStatic", e); } };
+
+    guard(() => { // SENSOR FAULT guard (page-side v7.6): corrupt data + pump ON = alert + stop button
+      let bar = document.getElementById("sfGuard");
+      const nowE = last._e || Date.now();
+      const fault = nowE - SENSOR_FAULT_UNTIL < 30 * 60000;
+      const pumpOn = (LIVE && LIVE.pump === "ON");
+      if (fault && pumpOn) {
+        if (!bar) {
+          bar = document.createElement("div");
+          bar.id = "sfGuard";
+          bar.style.cssText = "background:linear-gradient(90deg,#b71c1c,#e53935);color:#fff;padding:12px 18px;border-radius:10px;font-weight:bold;margin:10px 0;box-shadow:0 2px 10px rgba(0,0,0,.4);";
+          const hero = document.querySelector(".hero") || document.body;
+          hero.parentNode.insertBefore(bar, hero.nextSibling);
+        }
+        bar.innerHTML = "&#9888; SENSOR FAULT &amp; PUMP RUNNING &mdash; readings are garbage; the pump may be running blind. " +
+          '<button onclick="sendStop()" style="background:#fff;color:#b71c1c;border:0;padding:8px 14px;border-radius:6px;font-weight:bold;cursor:pointer;margin-left:8px;">STOP PUMP NOW</button>' +
+          " <small style='opacity:.85'>(the ESP also self-stops after 30 min max-run)</small>";
+      } else if (bar) { bar.remove(); }
+    });
 
     guard(() => { // hero
       const gen = document.querySelector(".hero .gen");
