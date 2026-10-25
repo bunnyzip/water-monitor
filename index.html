@@ -1280,12 +1280,53 @@
           lastSwingT = t2;
         }
         if (flips >= 3) {
-          // corrupt from the first big swing onward: keep only the clean leading part
+          // corrupt from the first big swing onward. Clean leading part still holds real
+          // usage: regime-segmented median-endpoint telescoping (Gemini-verified rule).
+          // 1) smooth with a 5-point rolling median (kills +/-14-35 L jitter),
+          // 2) split into decline/rise regimes on the smoothed series,
+          // 3) decline regime => usage = start - end (telescoped, noise-free),
+          //    rise regime >= 100 L => manual pump window (combo), smaller rises ignored.
           let cutIdx = perMin.findIndex(x => Math.abs(x[2]) >= 80);
-          for (let i = 0; i < cutIdx; i++)
-            if (perMin[i][2] > 0) bucket(perMin[i][2], perMin[i][0], perMin[i][1]);   // drains only: rises in a corrupt zone are unattributable
-          manualRuns = manualRuns.filter(r => r.t1 < s0 || r.s0 > t1);   // drop false windows
-          if (t1 > SENSOR_FAULT_UNTIL) SENSOR_FAULT_UNTIL = t1;          // page-side fault window
+          if (cutIdx < 0) cutIdx = perMin.length;
+          const lead = perMin.slice(0, cutIdx);
+          if (lead.length >= 3) {
+            // smoothed series: sm[j] = level at point j (5-point rolling median)
+            const lv = [Math.min(seg[k - 1].pct, 100)];
+            for (let i = 0; i < lead.length; i++) lv.push(Math.min(seg[k + i].pct, 100));
+            const sm = lv.map((_, i) => {
+              const w = lv.slice(Math.max(0, i - 2), i + 3).sort((a, b) => a - b);
+              return w[Math.floor(w.length / 2)];
+            });
+            const flushReg = (s, e) => {                       // points s..e inclusive
+              if (e <= s) return;
+              const dropL = (sm[s] - sm[e]) * LPCT;
+              const tA = s === 0 ? lead[0][0] : lead[s - 1][1];
+              const tB = lead[e - 1][1];
+              if (dropL > 2) {
+                bucket(dropL, tA, tB);                         // real drain, telescoped
+              } else if (dropL < -100) {                       // manual pump window
+                const durW = (tB - tA) / 60;
+                const combo = Math.max(0, (dayRate[a.date] || 31.8) * durW - (-dropL));
+                manualRuns.push({ s0: tA, t1: tB });
+                if (combo > 0) {
+                  manualComboDay[bd(tA).date] = (manualComboDay[bd(tA).date] || 0) + combo;
+                  bucket(combo, tA, tB);
+                }
+              }
+            };
+            let regStart = 0;
+            for (let i = 2; i < sm.length; i++) {
+              const dPrev = (sm[i - 2] - sm[i - 1]) * LPCT;
+              const dCur = (sm[i - 1] - sm[i]) * LPCT;
+              if ((dPrev > 3 && dCur < -3) || (dPrev < -3 && dCur > 3)) {
+                flushReg(regStart, i - 1);
+                regStart = i - 1;
+              }
+            }
+            flushReg(regStart, sm.length - 1);
+          }
+                    manualRuns = manualRuns.filter(r => r.t1 < s0 || r.s0 > t1);
+          if (t1 > SENSOR_FAULT_UNTIL) SENSOR_FAULT_UNTIL = t1;
           k = j + 1;
           continue;
         }
