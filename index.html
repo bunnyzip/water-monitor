@@ -1282,7 +1282,8 @@
         if (flips >= 3) {
           // corrupt from the first big swing onward: keep only the clean leading part
           let cutIdx = perMin.findIndex(x => Math.abs(x[2]) >= 80);
-          for (let i = 0; i < cutIdx; i++) bucket(perMin[i][2], perMin[i][0], perMin[i][1]);
+          for (let i = 0; i < cutIdx; i++)
+            if (perMin[i][2] > 0) bucket(perMin[i][2], perMin[i][0], perMin[i][1]);   // drains only: rises in a corrupt zone are unattributable
           manualRuns = manualRuns.filter(r => r.t1 < s0 || r.s0 > t1);   // drop false windows
           if (t1 > SENSOR_FAULT_UNTIL) SENSOR_FAULT_UNTIL = t1;          // page-side fault window
           k = j + 1;
