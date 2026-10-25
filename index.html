@@ -1452,6 +1452,28 @@
       AVG_FULL.push(vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : null);
     }
 
+    // ---- WATER BALANCE: day total = pump stored (NET per relay run) + confirmed manual + tank drawdown ----
+    // (delivered - change in storage) - the one number no engine can argue with.
+    for (const d of DAY_KEYS) {
+      const dayRows = TELEMETRY.filter(r => r.date === d);
+      if (dayRows.length < 2) continue;
+      let stored = 0, runStart = null;
+      dayRows.forEach(r => {
+        if (r.pump === "ON") { if (runStart === null) runStart = r.pct; }
+        else if (runStart !== null) { stored += Math.max(0, (r.pct - runStart) * LPCT); runStart = null; }
+      });
+      if (runStart !== null) stored += Math.max(0, (dayRows[dayRows.length - 1].pct - runStart) * LPCT);
+      const manual = DAYS[d].manualCombo || 0;
+      const drawdown = Math.max(0, (dayRows[0].pct - dayRows[dayRows.length - 1].pct) * LPCT);
+      DAYS[d].total = Math.round(stored + manual + drawdown);
+      const sum = DAYS[d].hours.reduce((s, v) => s + (v || 0), 0);
+      if (sum > 0 && DAYS[d].total > 0) {
+        const f = DAYS[d].total / sum;
+        DAYS[d].hours = DAYS[d].hours.map(v => v === null ? null : v * f);
+      }
+      DAYS[d].hours = DAYS[d].hours.map(v => v === null ? null : Math.max(0, Math.round(v)));
+    }
+
     // ---- stats for the static sections ----
     const n = TELEMETRY.length;
     const dropouts = TELEMETRY.filter(r => r.pct === 0).length;
