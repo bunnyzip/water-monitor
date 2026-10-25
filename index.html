@@ -1219,13 +1219,14 @@
     dayRateCache = dayRate;
     const dayRaw = {};
     const bucket = (liters, t0, t1) => {              // spread liters across the hour(s) spanned
-      let tt = t0;
-      while (tt < t1 - 0.001) {
-        const p = bd(tt);
+      const totalMin = (t1 - t0) / 60;                // v4 fix: divide by the FULL span,
+      let tt = t0;                                    // not the remaining span (the old
+      while (tt < t1 - 0.001) {                       // remaining-span bug inflated every
+        const p = bd(tt);                             // later hour of a multi-hour bucket)
         const nxt = tt - ((tt + 21600) % 3600) + 3600;
         const spanMin = Math.min(nxt, t1) - tt;
         const key = p.date + "|" + p.hour;
-        dayRaw[key] = (dayRaw[key] || 0) + liters * (spanMin / 60) / ((t1 - tt) / 60);
+        dayRaw[key] = (dayRaw[key] || 0) + liters * (spanMin / 60) / totalMin;
         tt = nxt;
       }
     };
@@ -1244,10 +1245,11 @@
           if (shedNow) {
             liters = (la - lb) * LPCT;                // mains down: pump cannot deliver
           } else {
-            const rise = (lb - la) * LPCT;
-            liters = rise <= 0 ? -rise                // stalled (power cut): only drain
-                                : 0;                  // pumping minutes: combo is computed
-          }                                             // once per FILL below (no clamp bias)
+            liters = 0;                               // v4.3: pumping minutes contribute 0 here.
+          }                                           // Fill slosh dips were counted as "stall drains"
+                                                      // (phantom 80-160 L/hour mid-fill). The fill's
+                                                      // simultaneous usage is covered once per FILL by
+                                                      // the combo (inflow - stored), not per interval.
           if (liters > 0) bucket(liters, a._e, b._e);
           k++;
           continue;
@@ -1288,23 +1290,23 @@
           //    rise regime >= 100 L => manual pump window (combo), smaller rises ignored.
           let cutIdx = perMin.findIndex(x => Math.abs(x[2]) >= 80);
           if (cutIdx < 0) cutIdx = perMin.length;
+          // leading clean part: regime-segmented median-endpoint telescoping
           const lead = perMin.slice(0, cutIdx);
           if (lead.length >= 3) {
-            // smoothed series: sm[j] = level at point j (5-point rolling median)
             const lv = [Math.min(seg[k - 1].pct, 100)];
             for (let i = 0; i < lead.length; i++) lv.push(Math.min(seg[k + i].pct, 100));
             const sm = lv.map((_, i) => {
               const w = lv.slice(Math.max(0, i - 2), i + 3).sort((a, b) => a - b);
               return w[Math.floor(w.length / 2)];
             });
-            const flushReg = (s, e) => {                       // points s..e inclusive
+            const flushReg = (s, e) => {
               if (e <= s) return;
               const dropL = (sm[s] - sm[e]) * LPCT;
               const tA = s === 0 ? lead[0][0] : lead[s - 1][1];
               const tB = lead[e - 1][1];
               if (dropL > 2) {
-                bucket(dropL, tA, tB);                         // real drain, telescoped
-              } else if (dropL < -100) {                       // manual pump window
+                bucket(dropL, tA, tB);
+              } else if (dropL < -100) {
                 const durW = (tB - tA) / 60;
                 const combo = Math.max(0, (dayRate[a.date] || 31.8) * durW - (-dropL));
                 manualRuns.push({ s0: tA, t1: tB });
@@ -1324,6 +1326,24 @@
               }
             }
             flushReg(regStart, sm.length - 1);
+          }
+          // corrupt region (first big swing -> stretch end): the per-minute truth is gone,
+          // but the NET change between the two real endpoints is known. Spread it evenly
+          // over the region's hours - no hour lies, no hour is starved. (Gemini-verified.)
+          if (cutIdx < perMin.length) {
+            const pctAtCut = Math.min(seg[k + cutIdx - 1].pct, 100);
+            const pctEnd = Math.min(seg[j].pct, 100);
+            const r0 = lead.length ? lead[lead.length - 1][1] : perMin[cutIdx - 1][0];
+            const r1 = t1;
+            const net = (pctAtCut - pctEnd) * LPCT;
+            if (net > 0 && r1 > r0) {
+              let cur = r0;
+              while (cur < r1) {
+                const seg2End = Math.min(cur + (3600 - (cur % 3600)), r1);   // hour boundary (BST = UTC+6, aligned)
+                bucket(net * ((seg2End - cur) / (r1 - r0)), cur, seg2End);
+                cur = seg2End + 1;
+              }
+            }
           }
                     manualRuns = manualRuns.filter(r => r.t1 < s0 || r.s0 > t1);
           if (t1 > SENSOR_FAULT_UNTIL) SENSOR_FAULT_UNTIL = t1;
@@ -1505,9 +1525,14 @@ function updateStatic() {
     guard(() => { // SENSOR FAULT guard (page-side v7.6): corrupt data + pump ON = alert + stop button
       let bar = document.getElementById("sfGuard");
       const nowE = last._e || Math.round(Date.now() / 1000);
-      const fault = (nowE - SENSOR_FAULT_UNTIL) < (30 * 60);          // 30 min, seconds
+      // fault NOW = a sawtooth reading exists within the last 12 min (not a stale morning fault)
+      const saw = sawtoothSet();
+      let faultNow = false;
+      for (let i = TELEMETRY.length - 1; i >= 0 && nowE - TELEMETRY[i]._e < 720; i--) {
+        if (TELEMETRY[i].pump !== "ON" && saw.has(TELEMETRY[i]._e)) { faultNow = true; break; }
+      }
       const pumpOn = (last && last.pump === "ON");
-      if (fault && pumpOn) {
+      if (faultNow && pumpOn) {
         if (!bar) {
           bar = document.createElement("div");
           bar.id = "sfGuard";
@@ -1822,6 +1847,7 @@ function updateStatic() {
         runStamps = []; prevSign = 0; flips = 0; stable = 0;
       }
       runStamps.push(r._e);
+      if (r.pump === "ON") { prevT = r._e; prevPct = null; continue; }   // fill slosh: never bridge across ON rows
       if (prevPct !== null && prevT !== null && r._e > prevT) {
         const d = (prevPct - r.pct) * LPCT;                            // +drain / -rise
         const big = Math.abs(d) >= 55;                                 // >= ~2.8% step
