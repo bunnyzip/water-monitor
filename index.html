@@ -520,7 +520,7 @@
     <div id="adminBox" style="display:none;margin-top:10px;padding:10px;border:1px dashed #999;border-radius:10px;">
       <div style="font-weight:800;margin-bottom:6px;">⚙️ Admin settings (password-protected)</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <label>Pump ON level % <input id="cfgTrig" type="number" min="30" max="55" style="width:70px;"></label>
+        <label>Pump ON level % <input id="cfgTrig" type="number" min="30" max="65" style="width:70px;"></label>
         <label>Pump OFF level % <input id="cfgCut" type="number" min="60" max="95" style="width:70px;"></label>
         <label>Pump kW <input id="cfgKw" type="number" step="0.1" min="0.3" max="7" style="width:70px;"></label>
         <label>৳/kWh <input id="cfgRate" type="number" step="0.5" min="1" max="30" style="width:70px;"></label>
@@ -1282,7 +1282,7 @@
         if (flips >= 3) {
           // corrupt from the first big swing onward: keep only the clean leading part
           let cutIdx = perMin.findIndex(x => Math.abs(x[2]) >= 80);
-          for (let i = 0; i < cutIdx; i++) bucket(perMin[i][0], perMin[i][1], perMin[i][2]);
+          for (let i = 0; i < cutIdx; i++) bucket(perMin[i][2], perMin[i][0], perMin[i][1]);
           manualRuns = manualRuns.filter(r => r.t1 < s0 || r.s0 > t1);   // drop false windows
           if (t1 > SENSOR_FAULT_UNTIL) SENSOR_FAULT_UNTIL = t1;          // page-side fault window
           k = j + 1;
@@ -1380,8 +1380,11 @@
       for (const key in dayRaw) { const parts = key.split("|"); if (parts[0] === d) raws[+parts[1]] = dayRaw[key]; }
       const hours = [];
       for (let hh = 0; hh < 24; hh++) hours.push(hh in raws ? Math.max(0, Math.round(raws[hh])) : null);
+      const dayCycles = CYCLES.filter(c => c.date === d);
+      const dayPumped = dayCycles.reduce((s, c) => s + c.gain_true_l, 0);
       DAYS[d] = { hours, total: hours.reduce((s, v) => s + (v !== null ? v : 0), 0),
-                  espCombo: Math.round(espComboDay[d] || 0), manualCombo: Math.round(manualComboDay[d] || 0) };
+                  espCombo: Math.round(espComboDay[d] || 0), manualCombo: Math.round(manualComboDay[d] || 0),
+                  cycles: dayCycles.length, pumped_l: dayPumped };
       DAY_KEYS.push(d);
     }
     // average profile: mean across days per hour, anchored so the sum = avg delivered (PC-exact)
@@ -1391,20 +1394,15 @@
       hourL[hh] = (hourL[hh] || 0) + dayRaw[key];
       (hourDays[hh] = hourDays[hh] || new Set()).add(parts[0]);
     }
-    let prof = Object.keys(hourL).map(h => [+h, hourL[h] / Object.keys(hourDays[h]).length]);
+    let prof = Object.keys(hourL).map(h => [+h, hourL[h] / (hourDays[h] ? hourDays[h].size : 1)]);
     const rawSum = prof.reduce((s, p) => s + p[1], 0);
     prof = prof.map(p => [p[0], rawSum ? p[1] / rawSum * avgDelivered : 0]);
-    AVG_FULL = []; AVG_ORIG = [];
+    AVG_ORIG = []; AVG_FULL = [];
     for (let hh = 0; hh < 24; hh++) {
       const f = prof.find(p => p[0] === hh);
-      AVG_FULL.push(f ? Math.round(f[1]) : null);
-      AVG_ORIG.push(f ? Math.round(f[1]) : null);
-    }
-    AVG_FULL = []; AVG_ORIG = [];
-    for (let hh = 0; hh < 24; hh++) {
+      AVG_ORIG.push(f ? Math.round(f[1]) : null);              // anchored profile (sums to avg delivered)
       const vals = DAY_KEYS.map(d => DAYS[d].hours[hh]).filter(v => v !== null);
-      const m = vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : null;
-      AVG_FULL.push(m); AVG_ORIG.push(m);
+      AVG_FULL.push(vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : null);
     }
 
     // ---- stats for the static sections ----
@@ -1464,9 +1462,9 @@ function updateStatic() {
 
     guard(() => { // SENSOR FAULT guard (page-side v7.6): corrupt data + pump ON = alert + stop button
       let bar = document.getElementById("sfGuard");
-      const nowE = last._e || Date.now();
-      const fault = nowE - SENSOR_FAULT_UNTIL < 30 * 60000;
-      const pumpOn = (LIVE && LIVE.pump === "ON");
+      const nowE = last._e || Math.round(Date.now() / 1000);
+      const fault = (nowE - SENSOR_FAULT_UNTIL) < (30 * 60);          // 30 min, seconds
+      const pumpOn = (last && last.pump === "ON");
       if (fault && pumpOn) {
         if (!bar) {
           bar = document.createElement("div");
@@ -1518,7 +1516,8 @@ function updateStatic() {
       }
       const nightVals = AVG_FULL.slice(0, 6).filter(v => v !== null);
       const nightBase = nightVals.length ? Math.round(nightVals.reduce((s, v) => s + v, 0) / nightVals.length) : null;
-      const bufPct = Math.max(0, pct - 60);
+      const trigNow = (isFinite(CFG.trig) ? CFG.trig : 60);
+      const bufPct = Math.max(0, pct - trigNow);
       const setBox = (i, big, sub) => {
         const b = boxes[i]; if (!b) return;
         b.querySelector(".big").textContent = big;
@@ -1537,7 +1536,7 @@ function updateStatic() {
         let line1 = "🔮 <strong>Next Auto-Fill ETA:</strong> measuring draw rate…";
         if (pct <= 60) line1 = "🔮 <strong>Next Auto-Fill ETA:</strong> <strong>IMMINENT</strong> — level at/below the 60% trigger";
         else if (rate !== null && rate > 0.5) {
-          const hrs = (pct - 60) / (rate / LPCT);
+          const hrs = (pct - trigNow) / (rate / LPCT);
           const etaD = new Date(Date.now() + hrs * 3600000);
           line1 = "🔮 <strong>Next Auto-Fill ETA:</strong> ≈ <strong>" + (hrs >= 24 ? (hrs / 24).toFixed(1) + " days" : hrs.toFixed(1) + " h") + "</strong> at current " + Math.round(rate) + " L/h draw" +
             (hrs < 48 ? " (≈ " + etaD.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) + ")" : "");
@@ -1723,7 +1722,7 @@ function updateStatic() {
     const dtObj = new Date(k + "T00:00:00");
     const ds = dtObj.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" });
     const kW = CFG.kw || 2.0, tariff = CFG.rate || 10;
-    const lPerKwh = (dayRateCache[d] || 28.5) * 60 / kW;         // liters pumped per kWh
+    const lPerKwh = (dayRateCache[k] || 28.5) * 60 / kW;         // liters pumped per kWh
     const kwh = d.total / lPerKwh, cost = kwh * tariff;
     let comboTxt = "";
     if (d.manualCombo > 0) comboTxt = ` &nbsp;•&nbsp; <span style="color:#6a1b9a;">manual pump: ${d.manualCombo.toLocaleString()} L</span>`;
@@ -1748,7 +1747,7 @@ function updateStatic() {
       const endP = cycleGainMode === 'true' ? c.peak_pct : c.cutoff_pct;
       const gainP = cycleGainMode === 'true' ? c.gain_true_pct : c.gain_on_pct;
       const gainL = cycleGainMode === 'true' ? c.gain_true_l : c.gain_on_l;
-      const isNew = c.no === 16;
+      const isNew = (c.no === CYCLES.length);
       return `
         <tr style="${isNew ? 'background:#e8f5e9;' : ''}">
           <td class="deep">#${c.no} ${isNew ? '<span class="pill good" style="font-size:10px;padding:1px 6px;">NEW</span>' : ''}</td>
@@ -1774,27 +1773,30 @@ function updateStatic() {
   function sawtoothSet() {
     if (sawCache.n === TELEMETRY.length) return sawCache.set;
     const set = new Set();
-    let runStart = null, prevSign = 0, flips = 0, stable = 0, prevT = null, prevPct = null;
+    let runStamps = [], prevSign = 0, flips = 0, stable = 0, prevT = null, prevPct = null;
     for (const r of TELEMETRY) {
-      if (prevT !== null && (r._e - prevT) > 120) {                    // gap: close run
-        if (flips >= 3) for (let e = runStart; e <= prevT; e += 60) set.add(e);
-        runStart = null; prevSign = 0; flips = 0; stable = 0;
+      if (prevT !== null && (r._e - prevT) > 180) {                    // gap: close run
+        if (flips >= 2) runStamps.forEach(e => set.add(e));
+        runStamps = []; prevSign = 0; flips = 0; stable = 0;
       }
+      runStamps.push(r._e);
       if (prevPct !== null && prevT !== null && r._e > prevT) {
         const d = (prevPct - r.pct) * LPCT;                            // +drain / -rise
-        const big = Math.abs(d) >= 78;
+        const big = Math.abs(d) >= 55;                                 // >= ~2.8% step
         const sgn = d > 0 ? 1 : -1;
-        if (runStart === null) runStart = prevT;
         if (big && prevSign !== 0 && sgn !== prevSign) flips++;
-        if (big) prevSign = sgn;
-        if (!big) { stable++; if (stable >= 8 && flips < 3) {          // settled: clean run
-          if (flips >= 3) for (let e = runStart; e <= prevT; e += 60) set.add(e);
-          runStart = r._e; prevSign = 0; flips = 0; stable = 0;
-        } }
+        if (big) { prevSign = sgn; stable = 0; }
+        else {
+          stable++;
+          if (stable >= 6) {                                           // settled: close clean run
+            if (flips >= 2) runStamps.forEach(e => set.add(e));
+            runStamps = [r._e]; prevSign = 0; flips = 0; stable = 0;
+          }
+        }
       }
       prevT = r._e; prevPct = r.pct;
     }
-    if (flips >= 3 && runStart !== null) for (let e = runStart; e <= prevT; e += 60) set.add(e);
+    if (flips >= 2) runStamps.forEach(e => set.add(e));
     sawCache = { n: TELEMETRY.length, set: set };
     return set;
   }
