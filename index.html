@@ -1870,6 +1870,36 @@ function updateStatic() {
     const onSeries = data.map(r => r.pump === 'ON' ? r.pct : null);
     const anomSeries = data.map(r => (r.pct === 0 || r.pct > 99.5 || saw.has(r._e)) ? r.pct : null);
 
+    // ---- S-curve bridge across hidden sensor-fault zones (owner's idea) ----
+    const estLabels = [], estSeries = [];
+    if (hideGlitch) {
+      const hiddenIdx = [];
+      TELEMETRY.forEach((r, idx) => {
+        if (dateFilter !== 'ALL' && r.date !== dateFilter) return;
+        if ((r.pct === 0 || saw.has(r._e))) hiddenIdx.push(idx);
+      });
+      const zones = [];
+      let z = null;
+      for (const idx of hiddenIdx) {
+        if (z && idx <= z.end + 6) z.end = idx; else { z = { start: idx, end: idx }; zones.push(z); }
+      }
+      for (const zz of zones) {
+        const A = TELEMETRY[zz.start - 1], B = TELEMETRY[zz.end + 1];
+        if (!A || !B) continue;
+        const span = B._e - A._e;
+        if (span <= 0 || span > 8 * 3600) continue;
+        const N = Math.min(40, Math.max(8, Math.round(span / 120)));
+        for (let k = 1; k < N; k++) {
+          const u = k / N;
+          const s = u * u * (3 - 2 * u);
+          const eA = new Date((A._e + span * u + 21600) * 1000);
+          const p2 = n => String(n).padStart(2, "0");
+          estLabels.push(eA.getUTCDate() + "/" + (eA.getUTCMonth()+1) + " " + p2(eA.getUTCHours()) + ":" + p2(eA.getUTCMinutes()));
+          estSeries.push(A.pct + (B.pct - A.pct) * s);
+        }
+      }
+    }
+
     const ctx = document.getElementById('telemetryCanvas').getContext('2d');
     if (timelineChart) timelineChart.destroy();
 
@@ -1895,6 +1925,18 @@ function updateStatic() {
             backgroundColor: '#2e7d32',
             pointRadius: 3.5,
             showLine: false
+          },
+          {
+            label: 'Estimated level (S-curve over fault)',
+            data: estSeries,
+            labels: estLabels,
+            borderColor: '#00bcd4',
+            backgroundColor: 'rgba(0,188,212,0.08)',
+            borderWidth: 1.6,
+            borderDash: [6, 5],
+            pointRadius: 0,
+            fill: false,
+            tension: 0
           },
           {
             label: 'Anomaly (overfill / glitch / sensor sawtooth)',
