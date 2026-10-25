@@ -1327,24 +1327,9 @@
             }
             flushReg(regStart, sm.length - 1);
           }
-          // corrupt region (first big swing -> stretch end): the per-minute truth is gone,
-          // but the NET change between the two real endpoints is known. Spread it evenly
-          // over the region's hours - no hour lies, no hour is starved. (Gemini-verified.)
-          if (cutIdx < perMin.length) {
-            const pctAtCut = Math.min(seg[k + cutIdx - 1].pct, 100);
-            const pctEnd = Math.min(seg[j].pct, 100);
-            const r0 = lead.length ? lead[lead.length - 1][1] : perMin[cutIdx - 1][0];
-            const r1 = t1;
-            const net = (pctAtCut - pctEnd) * LPCT;
-            if (net > 0 && r1 > r0) {
-              let cur = r0;
-              while (cur < r1) {
-                const seg2End = Math.min(cur + (3600 - (cur % 3600)), r1);   // hour boundary (BST = UTC+6, aligned)
-                bucket(net * ((seg2End - cur) / (r1 - r0)), cur, seg2End);
-                cur = seg2End + 1;
-              }
-            }
-          }
+          // corrupt region (first big swing -> stretch end): readings are false here, so
+          // per the owner's rule we IGNORE them - NO DATA for these hours. The region's
+          // true net usage is unknowable per-hour; fabricating flat values is a lie.
                     manualRuns = manualRuns.filter(r => r.t1 < s0 || r.s0 > t1);
           if (t1 > SENSOR_FAULT_UNTIL) SENSOR_FAULT_UNTIL = t1;
           k = j + 1;
