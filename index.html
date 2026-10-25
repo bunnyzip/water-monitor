@@ -1866,7 +1866,11 @@ function updateStatic() {
     });
 
     const labels = data.map(r => r.ts.slice(5, 16));
-    const pctSeries = data.map(r => r.pct);
+    // display-only 5-point rolling median: irons out fill slosh + heal steps (raw pct kept for tooltips)
+    const pctSeries = data.map((r, i) => {
+      const w = data.slice(Math.max(0, i - 2), i + 3).map(x => x.pct).sort((a, b) => a - b);
+      return w[Math.floor(w.length / 2)];
+    });
     const onSeries = data.map(r => r.pump === 'ON' ? r.pct : null);
     const anomSeries = data.map(r => (r.pct === 0 || r.pct > 99.5 || saw.has(r._e)) ? r.pct : null);
 
